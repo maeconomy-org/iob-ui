@@ -1,7 +1,14 @@
 {
-  "name": "iob",
-  "version": "0.1.0",
   "private": true,
+  "name": "iob-ui",
+  "version": "0.1.0",
+  "description": "IoB UI",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/recheck-io/iob-ui.git"
+  },
+  "author": "ReCheck B.V.",
+  "license": "MIT",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
