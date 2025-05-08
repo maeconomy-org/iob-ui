@@ -3,9 +3,9 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 
 import Footer from '@/components/footer'
+import { Toaster } from '@/components/ui/toaster'
 import ClientLayout from '@/components/client-layout'
 import { SearchProvider } from '@/contexts/search-context'
-import { CertificateProvider } from '@/contexts/certificate-context'
 import { APP_NAME, APP_DESCRIPTION } from '@/constants'
 
 export const metadata: Metadata = {
@@ -21,14 +21,17 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`${inter.className} h-full`}>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={`${inter.className} h-full`}
+    >
       <body className="flex flex-col min-h-screen h-full">
-        <CertificateProvider>
-          <SearchProvider>
-            <ClientLayout>{children}</ClientLayout>
-            <Footer />
-          </SearchProvider>
-        </CertificateProvider>
+        <SearchProvider>
+          <ClientLayout>{children}</ClientLayout>
+          <Footer />
+          <Toaster />
+        </SearchProvider>
       </body>
     </html>
   )

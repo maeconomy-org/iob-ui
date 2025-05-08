@@ -3,31 +3,28 @@
 import type React from 'react'
 
 import { useState, useEffect } from 'react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Plus, X } from 'lucide-react'
 import {
+  Button,
+  Input,
+  Label,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
-import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from '@/components/ui/dialog'
-import { Separator } from '@/components/ui/separator'
-import { Plus, X } from 'lucide-react'
+  Separator,
+} from '@/components/ui'
 import { generateUUIDv7 } from '@/lib/utils'
 import { processData } from '@/lib/data'
 
-// Removed "Demolish" from process types
-const processTypes = ['Mix', 'Pour']
-const unitTypes = ['liters', 'kg', 'tonnes', 'piece', 'm²', 'm³']
+// Included all process types
+const processTypes = ['Mix', 'Pour', 'Demolish']
 
 interface AddMaterialModalProps {
   isOpen: boolean
@@ -36,7 +33,7 @@ interface AddMaterialModalProps {
   onSave?: (material: any) => void
 }
 
-export default function AddMaterialModal({
+export function AddMaterialModal({
   isOpen,
   onClose,
   material,
@@ -45,20 +42,30 @@ export default function AddMaterialModal({
   const [formData, setFormData] = useState({
     name: '',
     properties: [
-      { key: 'unit', value: 'kg' },
-      { key: 'quantity', value: '0' },
+      {
+        uuid: generateUUIDv7(),
+        key: 'Unit',
+        values: [{ uuid: generateUUIDv7(), value: 'kg', files: [] }],
+        files: [],
+      },
+      {
+        uuid: generateUUIDv7(),
+        key: 'Quantity',
+        values: [{ uuid: generateUUIDv7(), value: '0', files: [] }],
+        files: [],
+      },
     ],
-    inputs: [] as { uuid: string; name: string; process: string }[],
-    outputs: [] as { uuid: string; name: string; process: string }[],
+    inputs: [] as { id: string; name: string; process: string }[],
+    outputs: [] as { id: string; name: string; process: string }[],
   })
 
   const [newInput, setNewInput] = useState({
-    uuid: '',
+    id: '',
     process: 'Mix',
   })
 
   const [newOutput, setNewOutput] = useState({
-    uuid: '',
+    id: '',
     process: 'Mix',
   })
 
@@ -67,21 +74,54 @@ export default function AddMaterialModal({
 
   useEffect(() => {
     setAvailableMaterials(
-      processData.map((m) => ({ uuid: m.uuid, name: m.name }))
+      processData.map((m) => ({ id: m.uuid, name: m.name }))
     )
   }, [])
 
   // Initialize form data when editing an existing material
   useEffect(() => {
     if (material) {
+      // Ensure properties have the right format
+      const convertedProperties =
+        material.properties?.map((prop: any) => {
+          // Check if the property is already in the new format with values array
+          if (prop.values) {
+            return prop
+          }
+
+          // Convert old format to new format
+          return {
+            uuid: prop.uuid || generateUUIDv7(),
+            key: prop.key,
+            values: [
+              {
+                uuid: generateUUIDv7(),
+                value: prop.value,
+                files: [],
+              },
+            ],
+            files: [],
+          }
+        }) || []
+
       setFormData({
         name: material.name || '',
         properties:
-          material.properties && material.properties.length > 0
-            ? [...material.properties]
+          convertedProperties.length > 0
+            ? convertedProperties
             : [
-                { key: 'unit', value: 'kg' },
-                { key: 'quantity', value: '0' },
+                {
+                  uuid: generateUUIDv7(),
+                  key: 'Unit',
+                  values: [{ uuid: generateUUIDv7(), value: 'kg', files: [] }],
+                  files: [],
+                },
+                {
+                  uuid: generateUUIDv7(),
+                  key: 'Quantity',
+                  values: [{ uuid: generateUUIDv7(), value: '0', files: [] }],
+                  files: [],
+                },
               ],
         inputs: material.inputs || [],
         outputs: material.outputs || [],
@@ -91,8 +131,18 @@ export default function AddMaterialModal({
       setFormData({
         name: '',
         properties: [
-          { key: 'unit', value: 'kg' },
-          { key: 'quantity', value: '0' },
+          {
+            uuid: generateUUIDv7(),
+            key: 'Unit',
+            values: [{ uuid: generateUUIDv7(), value: 'kg', files: [] }],
+            files: [],
+          },
+          {
+            uuid: generateUUIDv7(),
+            key: 'Quantity',
+            values: [{ uuid: generateUUIDv7(), value: '0', files: [] }],
+            files: [],
+          },
         ],
         inputs: [],
         outputs: [],
@@ -103,7 +153,15 @@ export default function AddMaterialModal({
   const handleAddProperty = () => {
     setFormData({
       ...formData,
-      properties: [...formData.properties, { key: '', value: '' }],
+      properties: [
+        ...formData.properties,
+        {
+          uuid: generateUUIDv7(),
+          key: '',
+          values: [{ uuid: generateUUIDv7(), value: '', files: [] }],
+          files: [],
+        },
+      ],
     })
   }
 
@@ -122,7 +180,23 @@ export default function AddMaterialModal({
     value: string
   ) => {
     const updatedProperties = [...formData.properties]
-    updatedProperties[index][field] = value
+
+    if (field === 'key') {
+      updatedProperties[index].key = value
+    } else {
+      // Update the first value in the values array
+      if (
+        updatedProperties[index].values &&
+        updatedProperties[index].values.length > 0
+      ) {
+        updatedProperties[index].values[0].value = value
+      } else {
+        updatedProperties[index].values = [
+          { uuid: generateUUIDv7(), value, files: [] },
+        ]
+      }
+    }
+
     setFormData({
       ...formData,
       properties: updatedProperties,
@@ -130,15 +204,15 @@ export default function AddMaterialModal({
   }
 
   const handleAddInput = () => {
-    if (!newInput.uuid) return
+    if (!newInput.id) return
 
     const selectedMaterial = availableMaterials.find(
-      (m) => m.uuid === newInput.uuid
+      (m) => m.id === newInput.id
     )
     if (!selectedMaterial) return
 
     const input = {
-      uuid: newInput.uuid,
+      id: newInput.id,
       name: selectedMaterial.name,
       process: newInput.process,
     }
@@ -149,21 +223,21 @@ export default function AddMaterialModal({
     })
 
     setNewInput({
-      uuid: '',
+      id: '',
       process: 'Mix',
     })
   }
 
   const handleAddOutput = () => {
-    if (!newOutput.uuid) return
+    if (!newOutput.id) return
 
     const selectedMaterial = availableMaterials.find(
-      (m) => m.uuid === newOutput.uuid
+      (m) => m.id === newOutput.id
     )
     if (!selectedMaterial) return
 
     const output = {
-      uuid: newOutput.uuid,
+      id: newOutput.id,
       name: selectedMaterial.name,
       process: newOutput.process,
     }
@@ -174,7 +248,7 @@ export default function AddMaterialModal({
     })
 
     setNewOutput({
-      uuid: '',
+      id: '',
       process: 'Mix',
     })
   }
@@ -201,7 +275,11 @@ export default function AddMaterialModal({
     e.preventDefault()
     // Filter out empty properties
     const validProperties = formData.properties.filter(
-      (prop) => prop.key && prop.value
+      (prop) =>
+        prop.key &&
+        prop.values &&
+        prop.values.length > 0 &&
+        prop.values[0].value
     )
 
     if (material) {
@@ -251,13 +329,9 @@ export default function AddMaterialModal({
             </DialogTitle>
           </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto p-6 pt-4">
-            <form
-              id="material-form"
-              onSubmit={handleSubmit}
-              className="space-y-4"
-            >
-              <div className="grid gap-4">
+          <div className="flex-1 overflow-y-auto p-6 pt-2">
+            <form id="add-material-form" onSubmit={handleSubmit}>
+              <div className="space-y-4">
                 <div className="grid gap-2">
                   <Label htmlFor="name">Name</Label>
                   <Input
@@ -273,7 +347,7 @@ export default function AddMaterialModal({
                 <Separator />
 
                 <div className="space-y-2">
-                  <div className="flex justify-between items-center">
+                  <div className="flex items-center justify-between">
                     <Label>Properties</Label>
                     <Button
                       type="button"
@@ -281,23 +355,29 @@ export default function AddMaterialModal({
                       size="sm"
                       onClick={handleAddProperty}
                     >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add Property
+                      <Plus className="h-4 w-4 mr-1" /> Add Property
                     </Button>
                   </div>
 
-                  {formData.properties.map((property, index) => (
-                    <div key={index} className="flex gap-2 items-center">
+                  {formData.properties.map((prop, index) => (
+                    <div
+                      key={prop.uuid || index}
+                      className="flex gap-2 items-center"
+                    >
                       <Input
                         placeholder="Property name"
-                        value={property.key}
+                        value={prop.key}
                         onChange={(e) =>
                           handlePropertyChange(index, 'key', e.target.value)
                         }
                       />
                       <Input
                         placeholder="Value"
-                        value={property.value}
+                        value={
+                          prop.values && prop.values.length > 0
+                            ? prop.values[0].value
+                            : ''
+                        }
                         onChange={(e) =>
                           handlePropertyChange(index, 'value', e.target.value)
                         }
@@ -307,7 +387,6 @@ export default function AddMaterialModal({
                         variant="ghost"
                         size="icon"
                         onClick={() => handleRemoveProperty(index)}
-                        disabled={formData.properties.length === 1}
                       >
                         <X className="h-4 w-4" />
                       </Button>
@@ -319,25 +398,22 @@ export default function AddMaterialModal({
 
                 <div className="space-y-2">
                   <Label>Inputs</Label>
-
                   <div className="flex gap-2">
                     <Select
-                      value={newInput.uuid}
+                      value={newInput.id}
                       onValueChange={(value) =>
-                        setNewInput({ ...newInput, uuid: value })
+                        setNewInput({ ...newInput, id: value })
                       }
                     >
                       <SelectTrigger className="flex-1">
                         <SelectValue placeholder="Select material" />
                       </SelectTrigger>
                       <SelectContent>
-                        {availableMaterials
-                          .filter((m) => m.uuid !== (material?.uuid || ''))
-                          .map((m) => (
-                            <SelectItem key={m.uuid} value={m.uuid}>
-                              {m.name}
-                            </SelectItem>
-                          ))}
+                        {availableMaterials.map((m) => (
+                          <SelectItem key={m.id} value={m.id}>
+                            {m.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
 
@@ -347,7 +423,7 @@ export default function AddMaterialModal({
                         setNewInput({ ...newInput, process: value })
                       }
                     >
-                      <SelectTrigger className="w-[150px]">
+                      <SelectTrigger className="w-[120px]">
                         <SelectValue placeholder="Process" />
                       </SelectTrigger>
                       <SelectContent>
@@ -364,56 +440,51 @@ export default function AddMaterialModal({
                     </Button>
                   </div>
 
-                  {formData.inputs.length > 0 && (
-                    <div className="space-y-2 mt-2">
-                      {formData.inputs.map((input, index) => (
-                        <div
-                          key={index}
-                          className="flex justify-between items-center p-2 border rounded-md"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span>{input.name}</span>
-                            <span className="text-sm text-muted-foreground">
-                              via {input.process}
-                            </span>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleRemoveInput(index)}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
+                  <div className="space-y-1 mt-2">
+                    {formData.inputs.map((input, index) => (
+                      <div
+                        key={input.id + index}
+                        className="flex items-center justify-between bg-muted p-2 rounded-md"
+                      >
+                        <div>
+                          <span className="font-medium">{input.name}</span>
+                          <span className="ml-2 text-sm text-muted-foreground">
+                            ({input.process})
+                          </span>
                         </div>
-                      ))}
-                    </div>
-                  )}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoveInput(index)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 <Separator />
 
                 <div className="space-y-2">
                   <Label>Outputs</Label>
-
                   <div className="flex gap-2">
                     <Select
-                      value={newOutput.uuid}
+                      value={newOutput.id}
                       onValueChange={(value) =>
-                        setNewOutput({ ...newOutput, uuid: value })
+                        setNewOutput({ ...newOutput, id: value })
                       }
                     >
                       <SelectTrigger className="flex-1">
                         <SelectValue placeholder="Select material" />
                       </SelectTrigger>
                       <SelectContent>
-                        {availableMaterials
-                          .filter((m) => m.uuid !== (material?.uuid || ''))
-                          .map((m) => (
-                            <SelectItem key={m.uuid} value={m.uuid}>
-                              {m.name}
-                            </SelectItem>
-                          ))}
+                        {availableMaterials.map((m) => (
+                          <SelectItem key={m.id} value={m.id}>
+                            {m.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
 
@@ -423,7 +494,7 @@ export default function AddMaterialModal({
                         setNewOutput({ ...newOutput, process: value })
                       }
                     >
-                      <SelectTrigger className="w-[150px]">
+                      <SelectTrigger className="w-[120px]">
                         <SelectValue placeholder="Process" />
                       </SelectTrigger>
                       <SelectContent>
@@ -440,42 +511,40 @@ export default function AddMaterialModal({
                     </Button>
                   </div>
 
-                  {formData.outputs.length > 0 && (
-                    <div className="space-y-2 mt-2">
-                      {formData.outputs.map((output, index) => (
-                        <div
-                          key={index}
-                          className="flex justify-between items-center p-2 border rounded-md"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span>{output.name}</span>
-                            <span className="text-sm text-muted-foreground">
-                              via {output.process}
-                            </span>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleRemoveOutput(index)}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
+                  <div className="space-y-1 mt-2">
+                    {formData.outputs.map((output, index) => (
+                      <div
+                        key={output.id + index}
+                        className="flex items-center justify-between bg-muted p-2 rounded-md"
+                      >
+                        <div>
+                          <span className="font-medium">{output.name}</span>
+                          <span className="ml-2 text-sm text-muted-foreground">
+                            ({output.process})
+                          </span>
                         </div>
-                      ))}
-                    </div>
-                  )}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoveOutput(index)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </form>
           </div>
 
-          <DialogFooter className="p-6 pt-2 border-t mt-auto">
+          <DialogFooter className="p-6 pt-2">
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" form="material-form">
-              Save
+            <Button type="submit" form="add-material-form">
+              {material ? 'Save Changes' : 'Add Material'}
             </Button>
           </DialogFooter>
         </div>

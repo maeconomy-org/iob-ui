@@ -102,3 +102,77 @@ IoB uses certificate-based mTLS authentication. To access the system:
 ## License
 
 This project is licensed under the [MIT License](LICENSE)
+
+# IOB - Intelligent Object Browser
+
+## About
+
+IOB is a web-based tool for managing and visualizing hierarchical object data. It provides a flexible interface for working with object trees, properties, and relationships.
+
+## Features
+
+- **Multiple Object Views**: Table, Explorer, and Columns views for different ways to interact with objects
+- **Object Management**: Create, edit, and delete objects with a rich interface
+- **Property Management**: Add, edit, and manage object properties
+- **File Attachments**: Attach and manage files for objects
+- **Object Models**: Define and use object models as templates
+- **Import/Export**: Import and export objects in JSON format
+- **Multi-Import**: Import multiple objects at once with the option to choose a parent object
+- **Object Graph**: Visualize object relationships in an interactive graph
+
+## Getting Started
+
+### Installation
+
+1. Clone the repository
+2. Install dependencies:
+   ```
+   npm install
+   ```
+3. Start the development server:
+   ```
+   npm run dev
+   ```
+4. Open [http://localhost:3000](http://localhost:3000) in your browser
+
+## Data Import/Export
+
+The application supports importing and exporting object data in JSON format.
+
+### Export Objects
+
+1. Click the Import/Export button in the main toolbar
+2. Select the Export tab
+3. The JSON data for all objects will be displayed in the text area
+4. Click "Download JSON" to save the data to a file
+
+### Import Objects
+
+1. Click the Import/Export button in the main toolbar
+2. Select the Import tab
+3. Either:
+   - Upload a JSON file by clicking "Select File"
+   - Paste JSON directly into the text area
+4. Choose import option:
+   - Import as root objects: Objects will be added at the root level
+   - Import as children of: Objects will be added as children of the selected parent object
+5. Click "Import Objects" to complete the import
+
+## Development
+
+### Project Structure
+
+- `/app`: Next.js app router pages and components
+- `/components`: Reusable UI components
+- `/lib`: Utility functions and data
+- `/public`: Static assets
+- `/styles`: Global styles
+
+### Key Technologies
+
+- Next.js
+- React
+- TypeScript
+- Tailwind CSS
+- Shadcn UI
+- Lucide Icons

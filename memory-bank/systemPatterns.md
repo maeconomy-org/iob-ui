@@ -2,160 +2,150 @@
 
 ## Architecture Overview
 
-The application follows a modern React-based architecture with Next.js:
+The IoB application follows a component-based architecture with a focus on reusability and modularity. The core system is built around a flexible object model that supports hierarchical structures and process flows.
 
 ```mermaid
 graph TD
-    A[Pages] --> B[Components]
-    B --> C[UI Components]
-    B --> D[Business Components]
-    D --> E[Data Management]
-    D --> F[State Management]
+    A[App] --> B[Object Management]
+    A --> C[Process Management]
+    B --> D[Object Creation/Editing]
+    B --> E[Object Visualization]
+    C --> F[Process Flow Creation]
+    C --> G[Flow Visualization]
+    D --> H[Property Management]
+    E --> I[Table Views]
+    E --> J[Explorer Views]
+    E --> K[Column Views]
+```
+
+## Core Design Patterns
+
+### Object Model
+
+The application uses a UUID-based object model with extensible properties:
+
+```typescript
+interface IoObject {
+  uuid: string
+  name: string
+  type?: string
+  properties: Property[]
+  children?: IoObject[]
+  files?: File[]
+  createdAt: string
+  updatedAt: string
+}
+
+interface Property {
+  uuid: string
+  key: string
+  value?: string
+  values?: PropertyValue[]
+  files?: File[]
+}
+
+interface PropertyValue {
+  uuid: string
+  value: string
+  files?: File[]
+}
+```
+
+### Process Flow Model
+
+Processes connect objects through input/output relationships:
+
+```typescript
+interface Process {
+  uuid: string
+  name: string
+  inputs: ProcessMaterial[]
+  outputs: ProcessMaterial[]
+  properties: Property[]
+  createdAt: string
+  updatedAt: string
+}
+
+interface ProcessMaterial {
+  id: string // References object UUID
+  name: string
+  quantity: number
+  unit: string
+  process?: string
+}
+```
+
+## Component Organization
+
+The application follows a structured component organization:
+
+```
+src/
+├── app/               # Next.js pages and routing
+├── components/        # Reusable UI components
+│   ├── forms/         # Form components
+│   ├── modals/        # Modal dialogs
+│   ├── object-views/  # Object visualization views
+│   ├── sheets/        # Slide-in sheet components
+│   ├── tables/        # Table components
+│   └── ui/            # Base UI components
+├── contexts/          # React context providers
+├── hooks/             # Custom React hooks
+├── lib/               # Utility functions and data
+└── types/             # TypeScript type definitions
 ```
 
 ## Key Technical Decisions
 
-1. Frontend Framework
+1. **Component Reusability**: Using consistent sheets and modals for object interaction
+2. **UI Component Structure**: Centralizing UI components with index.ts exports
+3. **Material Flow Tracking**: Implementing input/output relationships with quantity tracking
+4. **Object Management**: Consistent CRUD operations across different views
+5. **Visual Hierarchies**: Multiple view types (table, explorer, columns) for object visualization
 
-   - Next.js for server-side rendering and routing
-   - React for component-based architecture
-   - TypeScript for type safety
+## Data Flow Patterns
 
-2. UI Framework
+### Object Management Flow
 
-   - Tailwind CSS for styling
-   - Radix UI for accessible components
-   - Custom component library
+```mermaid
+flowchart LR
+    A[User Action] --> B[Component State]
+    B --> C[Component State Handler]
+    C --> D[Data Update]
+    D --> E[UI Update]
+```
 
-3. State Management
+### Process Creation Flow
 
-   - React's built-in state management
-   - Local component state
-   - Context API for global state
+```mermaid
+flowchart LR
+    A[Select Inputs] --> B[Input Quantity]
+    B --> C[Define Process]
+    C --> D[Create Outputs]
+    D --> E[Output Quantity]
+    E --> F[Save Process]
+```
 
-4. Project Structure
-   - Source code in `src` directory
-   - Path aliases for clean imports
-   - Feature-based organization
+## View Patterns
 
-## Design Patterns
+1. **Table Views**: For dense information display with row actions
+2. **Explorer Views**: For hierarchical object navigation
+3. **Column Views**: For Kanban-style workflow visualization
+4. **Sheets**: For detailed object viewing and editing
+5. **Modals**: For confirmations and quick actions
 
-1. Component Patterns
+## State Management
 
-   - Container/Presenter pattern
-   - Compound components
-   - Higher-order components
+The application uses React's built-in state management with hooks:
 
-2. Data Patterns
+1. **Component State**: useState for local component state
+2. **Context API**: For sharing state between related components
+3. **Props Drilling**: For passing data and handlers down the component tree
 
-   - Props drilling minimization
-   - State lifting
-   - Controlled components
+## UI/UX Patterns
 
-3. UI Patterns
-   - Modal-based forms
-   - Table-based data display
-   - Hierarchical navigation
-
-## Component Relationships
-
-1. Object Management
-
-   - ObjectsTable → ObjectDetailsModal
-   - ObjectsTable → AddObjectModal
-   - ObjectsTable → PropertyDetailsModal
-
-2. Process Management
-
-   - ProcessTable → ProcessDetailsModal
-   - ProcessTable → AddMaterialModal
-   - ProcessForm → ProcessTable
-
-3. Authentication
-   - AuthPage → CertificateSelector
-   - CertificateSelector → Certificate Details
-   - AuthPage → Help Documentation
-
-## Data Flow
-
-1. Object Flow
-
-   - Object creation/editing
-   - Property management
-   - Hierarchy navigation
-
-2. Process Flow
-
-   - Process creation/editing
-   - Material management
-   - Status tracking
-
-3. Authentication Flow
-   - Certificate selection
-   - mTLS handshake
-   - Session management
-
-## File Organization
-
-1. Page Structure
-
-   ```
-   src/app/
-   ├── page.tsx              # Auth page
-   ├── objects/
-   │   ├── page.tsx         # Objects list
-   │   └── [uuid]/
-   │       └── page.tsx     # Object details
-   └── help/
-       └── page.tsx         # Help documentation
-   ```
-
-2. Component Structure
-
-   ```
-   src/components/
-   ├── ui/                  # Shared UI components
-   ├── objects/            # Object-related components
-   └── process/           # Process-related components
-   ```
-
-3. Utility Structure
-   ```
-   src/
-   ├── lib/               # Shared utilities
-   └── hooks/            # Custom React hooks
-   ```
-
-## Import Patterns
-
-1. Component Imports
-
-   ```typescript
-   import { Button } from '@/components/ui/button'
-   import { ObjectsTable } from '@/components/objects-table'
-   ```
-
-2. Utility Imports
-   ```typescript
-   import { formatDate } from '@/lib/utils'
-   import { useAuth } from '@/hooks/use-auth'
-   ```
-
-## Error Handling
-
-1. Authentication Errors
-
-   - Certificate validation failures
-   - Session expiration
-   - Network issues
-
-2. Data Errors
-
-   - API request failures
-   - Validation errors
-   - State conflicts
-
-3. UI Error Boundaries
-   - Component error catching
-   - Fallback UI
-   - Error recovery
+1. **Consistent Actions**: Edit/View/Delete actions appear in the same position across views
+2. **Sheet-Based Editing**: Slide-in sheets for detailed object editing
+3. **Dropdown Actions**: Dropdown menus for row-level actions in tables
+4. **Templates**: Quick templates for common material types
+5. **Progressive Disclosure**: Complex features revealed progressively in the interface

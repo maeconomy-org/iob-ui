@@ -2,50 +2,20 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { Building2, Search } from 'lucide-react'
 import { usePathname, useRouter } from 'next/navigation'
-import { Building2, Search, User, ChevronDown, LogOut } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from '@/components/ui/dropdown-menu'
-import { useCertificate, Certificate } from '@/contexts/certificate-context'
-import { SearchCommand } from '@/components/search-command'
+
+import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui'
 import { APP_ACRONYM, NAV_ITEMS } from '@/constants'
+import { SearchCommand } from '@/components/search-command'
 
 export default function Navbar() {
   const pathname = usePathname()
-  const router = useRouter()
-  const {
-    certificates,
-    selectedCertificate,
-    setSelectedCertificate,
-    getStatusColor,
-    logout,
-  } = useCertificate()
   const [isSearchOpen, setIsSearchOpen] = useState(false)
 
-  const handleLogout = () => {
-    // Clear session storage
-    logout()
-
-    // Redirect to auth page
-    router.push('/')
-  }
-
-  const handleCertificateChange = (cert: Certificate) => {
-    setSelectedCertificate(cert)
-  }
-
-  const getFirstName = (name: string) => {
-    return name.split(' ')[0]
-  }
-
   return (
-    <header className="border-b bg-white sticky top-0 z-10">
+    <header className="border-b bg-white top-0 z-10">
       <div className="container mx-auto py-3 px-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-8">
@@ -61,11 +31,12 @@ export default function Navbar() {
                 <Link
                   key={item.path}
                   href={item.path}
-                  className={`text-sm font-medium transition-colors hover:text-primary ${
+                  className={cn(
+                    'text-sm font-medium transition-colors hover:cursor-pointer hover:text-primary',
                     pathname === item.path || pathname.startsWith(item.path)
                       ? 'text-primary'
                       : 'text-muted-foreground'
-                  }`}
+                  )}
                 >
                   {item.name}
                 </Link>
@@ -90,59 +61,6 @@ export default function Navbar() {
             </Button>
 
             <SearchCommand open={isSearchOpen} onOpenChange={setIsSearchOpen} />
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="flex items-center gap-2">
-                  <User className="h-4 w-4" />
-                  <span className="hidden sm:inline">
-                    {selectedCertificate?.subject.commonName
-                      ? getFirstName(selectedCertificate.subject.commonName)
-                      : 'User'}
-                  </span>
-                  <ChevronDown className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[240px]">
-                <div className="px-2 py-1.5 text-sm font-medium text-muted-foreground">
-                  {selectedCertificate?.subject.commonName || 'User'}
-                </div>
-                {certificates.length > 1 && (
-                  <>
-                    <div className="px-2 py-1.5 text-xs text-muted-foreground">
-                      Available Certificates
-                    </div>
-                    {certificates.map((cert) => (
-                      <DropdownMenuItem
-                        key={cert.id}
-                        onClick={() => handleCertificateChange(cert)}
-                        className={`cursor-pointer ${selectedCertificate?.id === cert.id ? 'bg-primary/5' : ''}`}
-                      >
-                        <div className="flex items-center w-full">
-                          <span
-                            className={`w-2 h-2 rounded-full mr-2 ${getStatusColor(cert.status)}`}
-                          ></span>
-                          <span className="font-medium py-0.5">
-                            {cert.subject.commonName}
-                          </span>
-                          {selectedCertificate?.id === cert.id && (
-                            <span className="ml-auto w-1.5 h-1.5 rounded-full bg-primary"></span>
-                          )}
-                        </div>
-                      </DropdownMenuItem>
-                    ))}
-                    <DropdownMenuSeparator />
-                  </>
-                )}
-                <DropdownMenuItem
-                  onClick={handleLogout}
-                  className="cursor-pointer text-red-600"
-                >
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Logout
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
         </div>
       </div>

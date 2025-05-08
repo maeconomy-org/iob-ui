@@ -64,7 +64,8 @@ export function SearchCommand({
   // Setup keyboard shortcuts
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if (e.key === '/' || e.key === 'k') {
+      // add ctrl/cmd + k
+      if ((e.key === '/' || e.key === 'k') && (e.ctrlKey || e.metaKey)) {
         e.preventDefault()
         onOpenChange(!open)
       }

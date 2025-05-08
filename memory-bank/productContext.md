@@ -1,72 +1,102 @@
 # Product Context
 
-## Problem Statement
+## Purpose
 
-Governments and municipalities face challenges with:
+The IoB (Internet of Buildings) application serves as a platform for tracking and managing building materials, components, and processes for government and municipal use. It provides a comprehensive system for creating digital material passports, monitoring material flows, and managing the lifecycle of building components.
 
-- Lack of detailed information about building materials and components
-- Complex building hierarchies and material relationships
-- Difficult tracking of construction and demolition processes
-- Need for material passports and circular economy compliance
-- Environmental impact assessment requirements
+## Core Problems Solved
 
-## Solution
+1. **Material Tracking Challenges**
 
-IoB provides a comprehensive solution through:
+   - Tracking materials throughout their lifecycle from raw materials to components
+   - Managing complex hierarchical relationships between building objects
+   - Documenting material transformations through manufacturing processes
+   - Maintaining material properties and metadata throughout changes
 
-1. Building Component Management
+2. **Process Management Complexity**
 
-   - Hierarchical view of buildings (building → floors → rooms → components)
-   - Detailed material property tracking
-   - Component relationship mapping
-   - Easy navigation through building structures
+   - Connecting inputs and outputs across multiple processes
+   - Tracking quantities and units through transformation processes
+   - Documenting manufacturing methods and parameters
+   - Creating consistent material passports across different processes
 
-2. Material Process Management
-   - Construction process visualization
-   - Material lifecycle tracking
-   - Demolition process monitoring
-   - Material reuse potential assessment
+3. **Data Organization**
+   - Organizing building components in meaningful hierarchies
+   - Managing extensive property sets for various materials
+   - Establishing relationships between objects and processes
+   - Maintaining consistent object identification across the system
 
 ## User Experience Goals
 
-1. Efficiency
+1. **Intuitive Material Flow Management**
 
-   - Quick access to building and material information
-   - Intuitive navigation through building structures
-   - Fast data entry for construction teams
+   - Simple process creation with input/output relationships
+   - Quick material creation through templates and suggestions
+   - Visual representation of material transformations
+   - Efficient quantity and unit tracking
 
-2. Clarity
+2. **Flexible Object Organization**
 
-   - Clear visualization of building hierarchies
-   - Easy-to-understand material flows
-   - Transparent material property management
+   - Multiple views (table, explorer, columns) for different use cases
+   - Hierarchical navigation of building components
+   - Consistent object management across all views
+   - Easy property management for all objects
 
-3. Reliability
-   - Accurate material tracking
-   - Reliable construction process monitoring
-   - Precise relationship mapping between components
+3. **Efficient Workflow**
+   - Streamlined process for common operations
+   - Consistent UI patterns across different features
+   - Intelligent suggestions for outputs based on inputs
+   - Template-based approaches for repeated tasks
 
-## Target Users
+## Key User Journeys
 
-1. Government Officials
+1. **Material Passport Creation**
 
-   - Need overview of building materials
-   - Require access to material passports
-   - Monitor environmental compliance
+   ```mermaid
+   graph LR
+     A[Create Building Object] --> B[Add Properties]
+     B --> C[Define Subcomponents]
+     C --> D[Link to Processes]
+     D --> E[Generate Passport]
+   ```
 
-2. Municipal Workers
+2. **Process Flow Documentation**
 
-   - Track construction processes
-   - Manage building information
-   - Update material data
+   ```mermaid
+   graph LR
+     A[Select Input Materials] --> B[Define Quantities]
+     B --> C[Specify Process]
+     C --> D[Create Output Materials]
+     D --> E[Document Properties]
+   ```
 
-3. Construction Teams
+3. **Building Hierarchy Management**
+   ```mermaid
+   graph TD
+     A[Create Building] --> B[Define Floors]
+     B --> C[Add Rooms]
+     C --> D[Specify Components]
+     D --> E[Link Materials]
+   ```
 
-   - Record material usage
-   - Document building components
-   - Track construction progress
+## Business Value
 
-4. Environmental Analysts
-   - Assess material sustainability
-   - Track circular economy metrics
-   - Generate environmental reports
+1. **Regulatory Compliance**
+
+   - Material passport documentation for building regulations
+   - Lifecycle tracking for environmental compliance
+   - Documentation of material properties for safety standards
+   - Chain of custody for certified materials
+
+2. **Resource Optimization**
+
+   - Tracking material quantities through processes
+   - Identifying reuse opportunities
+   - Documenting material transformations
+   - Managing material properties for optimal use
+
+3. **Sustainability Metrics**
+   - Documentation of material origins
+   - Tracking recyclable components
+   - Monitoring embodied carbon through processes
+   - Enabling circular economy principles
