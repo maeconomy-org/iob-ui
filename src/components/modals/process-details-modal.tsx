@@ -1,26 +1,28 @@
 'use client'
 
+import { useState } from 'react'
+import { FileText } from 'lucide-react'
+
 import {
+  Badge,
+  Button,
+  Separator,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from '@/components/ui/dialog'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
-import { FileText } from 'lucide-react'
-import {
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
-import { useState } from 'react'
-import { Button } from '@/components/ui/button'
+} from '@/components/ui'
 
 interface ProcessDetailsModalProps {
   process: any
@@ -28,7 +30,7 @@ interface ProcessDetailsModalProps {
   onClose: () => void
 }
 
-export default function ProcessDetailsModal({
+export function ProcessDetailsModal({
   process,
   isOpen,
   onClose,
@@ -43,14 +45,20 @@ export default function ProcessDetailsModal({
 
   const getPropertyValue = (properties: any[], key: string) => {
     const property = properties.find((prop) => prop.key === key)
-    return property ? property.value : ''
+    if (!property) return ''
+
+    if (property.values && property.values.length > 0) {
+      return property.values.map((v: any) => v.value).join(', ')
+    }
+
+    return property.value || ''
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[700px] p-0 overflow-hidden">
         <div className="flex flex-col h-full max-h-[85vh]">
-          <DialogHeader className="p-6 pb-2">
+          <DialogHeader className="px-6 py-4">
             <DialogTitle className="flex items-center gap-2">
               <span>{process.name}</span>
             </DialogTitle>
@@ -62,9 +70,24 @@ export default function ProcessDetailsModal({
             className="flex flex-col flex-1"
           >
             <TabsList className="px-6 justify-start border-b rounded-none">
-              <TabsTrigger value="details">Details</TabsTrigger>
-              <TabsTrigger value="flow">Process Flow</TabsTrigger>
-              <TabsTrigger value="files">Files</TabsTrigger>
+              <TabsTrigger
+                value="details"
+                className="text-base px-4 py-2 data-[state=active]:bg-white"
+              >
+                Details
+              </TabsTrigger>
+              <TabsTrigger
+                value="flow"
+                className="text-base px-4 py-2 data-[state=active]:bg-white"
+              >
+                Process Flow
+              </TabsTrigger>
+              <TabsTrigger
+                value="files"
+                className="text-base px-4 py-2 data-[state=active]:bg-white"
+              >
+                Files
+              </TabsTrigger>
             </TabsList>
 
             <div className="flex-1 overflow-y-auto p-6 pt-4">
@@ -104,11 +127,15 @@ export default function ProcessDetailsModal({
                   <div className="grid grid-cols-2 gap-2">
                     {process.properties.map((prop: any) => (
                       <div
-                        key={prop.key}
+                        key={prop.uuid || prop.key}
                         className="flex flex-col p-2 border rounded-md"
                       >
                         <span className="text-sm font-medium">{prop.key}</span>
-                        <span className="text-sm">{prop.value}</span>
+                        <span className="text-sm">
+                          {prop.values && prop.values.length > 0
+                            ? prop.values.map((v: any) => v.value).join(', ')
+                            : prop.value}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -119,22 +146,35 @@ export default function ProcessDetailsModal({
                 <div>
                   <h3 className="text-sm font-medium mb-2">Inputs</h3>
                   {process.inputs && process.inputs.length > 0 ? (
-                    <Table className="border">
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Material</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {process.inputs.map((input: any) => (
-                          <TableRow key={input.uuid}>
-                            <TableCell>{input.name}</TableCell>
+                    <div className="rounded-md border overflow-hidden">
+                      <Table>
+                        <TableHeader className="bg-muted/50">
+                          <TableRow>
+                            <TableHead>Material</TableHead>
+                            <TableHead>Quantity</TableHead>
+                            <TableHead>Process</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHeader>
+                        <TableBody>
+                          {process.inputs.map((input: any) => (
+                            <TableRow
+                              key={input.id || input.uuid}
+                              className="hover:bg-muted/50 cursor-pointer"
+                            >
+                              <TableCell className="font-medium">
+                                {input.name}
+                              </TableCell>
+                              <TableCell>
+                                {input.quantity || '1'} {input.unit || ''}
+                              </TableCell>
+                              <TableCell>{input.process}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
                   ) : (
-                    <div className="text-sm text-muted-foreground">
+                    <div className="text-sm text-muted-foreground bg-muted/20 rounded-md p-3">
                       No inputs defined
                     </div>
                   )}
@@ -144,8 +184,8 @@ export default function ProcessDetailsModal({
                   <div className="flex items-center gap-2">
                     <Badge className="px-4 py-2">{process.name}</Badge>
                     <span className="text-sm text-muted-foreground">
-                      {getPropertyValue(process.properties, 'quantity')}{' '}
-                      {getPropertyValue(process.properties, 'unit')}
+                      {getPropertyValue(process.properties, 'Quantity')}{' '}
+                      {getPropertyValue(process.properties, 'Unit')}
                     </span>
                   </div>
                 </div>
@@ -153,22 +193,35 @@ export default function ProcessDetailsModal({
                 <div>
                   <h3 className="text-sm font-medium mb-2">Outputs</h3>
                   {process.outputs && process.outputs.length > 0 ? (
-                    <Table className="border">
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Material</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {process.outputs.map((output: any) => (
-                          <TableRow key={output.uuid}>
-                            <TableCell>{output.name}</TableCell>
+                    <div className="rounded-md border overflow-hidden">
+                      <Table>
+                        <TableHeader className="bg-muted/50">
+                          <TableRow>
+                            <TableHead>Material</TableHead>
+                            <TableHead>Quantity</TableHead>
+                            <TableHead>Process</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHeader>
+                        <TableBody>
+                          {process.outputs.map((output: any) => (
+                            <TableRow
+                              key={output.id || output.uuid}
+                              className="hover:bg-muted/50 cursor-pointer"
+                            >
+                              <TableCell className="font-medium">
+                                {output.name}
+                              </TableCell>
+                              <TableCell>
+                                {output.quantity || '1'} {output.unit || ''}
+                              </TableCell>
+                              <TableCell>{output.process}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
                   ) : (
-                    <div className="text-sm text-muted-foreground">
+                    <div className="text-sm text-muted-foreground bg-muted/20 rounded-md p-3">
                       No outputs defined
                     </div>
                   )}
@@ -186,7 +239,7 @@ export default function ProcessDetailsModal({
               </TabsContent>
             </div>
 
-            <DialogFooter className="p-6 pt-2 border-t mt-auto">
+            <DialogFooter className="px-6 py-4 border-t mt-auto">
               <Button variant="outline" onClick={onClose}>
                 Close
               </Button>

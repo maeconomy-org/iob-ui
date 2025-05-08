@@ -2,20 +2,32 @@
 
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
-import { Info } from 'lucide-react'
+import { Info, PlusCircle } from 'lucide-react'
 
-import { objectsData } from '@/lib/data'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/components/ui'
 import Breadcrumbs from '@/components/breadcrumbs'
-import ObjectsTable from '@/components/objects-table'
-import ObjectDetailsModal from '@/components/object-details-modal'
+import { ObjectsTable } from '@/components/tables'
+import { objectsData, objectModelsData } from '@/lib/data'
+import { DeleteConfirmationDialog } from '@/components/modals'
+import { ObjectDetailsSheet, ObjectEditSheet } from '@/components/sheets'
 
 export default function ObjectChildrenPage() {
   const params = useParams()
   const [parentObject, setParentObject] = useState<any>(null)
   const [childrenData, setChildrenData] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
+
+  // Parent object view states
+  const [isParentDetailsSheetOpen, setIsParentDetailsSheetOpen] =
+    useState(false)
+
+  // Child object states
+  const [isObjectSheetOpen, setIsObjectSheetOpen] = useState(false)
+  const [isObjectEditSheetOpen, setIsObjectEditSheetOpen] = useState(false)
+  const [selectedObject, setSelectedObject] = useState<any>(null)
+  const [objectSheetMode, setObjectSheetMode] = useState<'add' | 'edit'>('add')
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [objectToDelete, setObjectToDelete] = useState<any>(null)
 
   useEffect(() => {
     const uuid = params.uuid as string
@@ -48,8 +60,45 @@ export default function ObjectChildrenPage() {
     setIsLoading(false)
   }, [params.uuid])
 
-  const handleViewDetails = () => {
-    setIsDetailsModalOpen(true)
+  const handleViewParentDetails = () => {
+    setIsParentDetailsSheetOpen(true)
+  }
+
+  const handleViewObject = (object: any) => {
+    setSelectedObject(object)
+    setIsObjectSheetOpen(true)
+  }
+
+  const handleEditObject = (object: any) => {
+    setSelectedObject(object)
+    setObjectSheetMode('edit')
+    setIsObjectEditSheetOpen(true)
+  }
+
+  const handleAddObject = () => {
+    setSelectedObject(null)
+    setObjectSheetMode('add')
+    setIsObjectEditSheetOpen(true)
+  }
+
+  const handleSaveObject = (object: any) => {
+    if (objectSheetMode === 'add') {
+      setChildrenData([...childrenData, object])
+    } else {
+      setChildrenData(
+        childrenData.map((obj: any) =>
+          obj.uuid === object.uuid ? object : obj
+        )
+      )
+    }
+    setIsObjectEditSheetOpen(false)
+  }
+
+  const handleDeleteObject = (objectToRemove: any) => {
+    setChildrenData(
+      childrenData.filter((child) => child.uuid !== objectToRemove.uuid)
+    )
+    setIsObjectSheetOpen(false)
   }
 
   if (isLoading) {
@@ -83,7 +132,7 @@ export default function ObjectChildrenPage() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={handleViewDetails}
+                onClick={handleViewParentDetails}
                 className="h-8 w-8"
                 title="View object details"
               >
@@ -94,6 +143,11 @@ export default function ObjectChildrenPage() {
               {parentObject.uuid}
             </p>
           </div>
+
+          <Button onClick={handleAddObject}>
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Add Child
+          </Button>
         </div>
 
         <div className="mb-4">
@@ -101,7 +155,13 @@ export default function ObjectChildrenPage() {
         </div>
 
         {childrenData.length > 0 ? (
-          <ObjectsTable initialData={childrenData} showParentLink={true} />
+          <ObjectsTable
+            initialData={childrenData}
+            showParentLink={true}
+            onViewObject={handleViewObject}
+            onEditObject={handleEditObject}
+            availableModels={objectModelsData}
+          />
         ) : (
           <div className="flex justify-center items-center h-40 border rounded-md bg-muted/50">
             <p className="text-muted-foreground">No children found</p>
@@ -109,10 +169,58 @@ export default function ObjectChildrenPage() {
         )}
       </div>
 
-      <ObjectDetailsModal
+      {/* Parent Object Details Sheet */}
+      <ObjectDetailsSheet
+        isOpen={isParentDetailsSheetOpen}
+        onClose={() => setIsParentDetailsSheetOpen(false)}
         object={parentObject}
-        isOpen={isDetailsModalOpen}
-        onClose={() => setIsDetailsModalOpen(false)}
+        availableModels={objectModelsData}
+        onEdit={() => {
+          // Handle parent editing if needed
+        }}
+        onDelete={() => {
+          // Handle parent deletion if needed
+        }}
+      />
+
+      {/* Child Object Details Sheet */}
+      <ObjectDetailsSheet
+        isOpen={isObjectSheetOpen}
+        onClose={() => setIsObjectSheetOpen(false)}
+        object={selectedObject}
+        availableModels={objectModelsData}
+        onEdit={() => {
+          setIsObjectSheetOpen(false)
+          setObjectSheetMode('edit')
+          setIsObjectEditSheetOpen(true)
+        }}
+        onDelete={(object) => {
+          setObjectToDelete(object)
+          setIsDeleteModalOpen(true)
+        }}
+      />
+
+      {/* Add/Edit Child Object Sheet */}
+      <ObjectEditSheet
+        isOpen={isObjectEditSheetOpen}
+        onClose={() => setIsObjectEditSheetOpen(false)}
+        object={selectedObject}
+        availableModels={objectModelsData}
+        mode={objectSheetMode}
+        onSave={handleSaveObject}
+      />
+
+      <DeleteConfirmationDialog
+        open={isDeleteModalOpen}
+        onOpenChange={setIsDeleteModalOpen}
+        objectName={objectToDelete?.name || 'this child object'}
+        onDelete={() => {
+          if (objectToDelete) {
+            handleDeleteObject(objectToDelete)
+            setIsDeleteModalOpen(false)
+            setObjectToDelete(null)
+          }
+        }}
       />
     </div>
   )

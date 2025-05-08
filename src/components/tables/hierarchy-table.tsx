@@ -2,15 +2,6 @@
 
 import { useState } from 'react'
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import { Button } from '@/components/ui/button'
-import {
   ChevronRight,
   ChevronDown,
   Plus,
@@ -19,19 +10,25 @@ import {
   MoreHorizontal,
 } from 'lucide-react'
 import {
+  Button,
+  Badge,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { Badge } from '@/components/ui/badge'
-import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import EntityForm from './entity-form'
+  useToast,
+} from '@/components/ui'
+import EntityForm from '@/components/entity-form'
 
 // Mock data structure
 const initialData = [
@@ -111,13 +108,14 @@ const initialData = [
   },
 ]
 
-export default function HierarchyTable() {
+export function HierarchyTable() {
   const [data, setData] = useState(initialData)
   const [expandedRows, setExpandedRows] = useState<Record<number, boolean>>({
     1: true,
   })
   const [editEntity, setEditEntity] = useState<any>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const { toast } = useToast()
 
   const toggleRow = (id: number) => {
     setExpandedRows((prev) => ({
@@ -131,9 +129,12 @@ export default function HierarchyTable() {
     setIsDialogOpen(true)
   }
 
-  const handleDelete = (id: number) => {
-    // Implement delete logic here
-    alert(`Delete entity with ID: ${id}`)
+  const handleDelete = (id: string) => {
+    toast({
+      title: 'Entity Deleted',
+      description: `Entity with ID: ${id} has been deleted`,
+    })
+    // Implement actual delete logic here
   }
 
   const renderRows = (entities: any[], level = 0) => {
@@ -170,7 +171,7 @@ export default function HierarchyTable() {
           <TableCell>
             {Object.entries(entity.properties).map(([key, value]) => (
               <div key={key} className="text-sm">
-                <span className="font-medium">{key}:</span> {value}
+                <span className="font-medium">{key}:</span> {value as string}
               </div>
             ))}
           </TableCell>
@@ -186,7 +187,9 @@ export default function HierarchyTable() {
                   <Pencil className="mr-2 h-4 w-4" />
                   Edit
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleDelete(entity.id)}>
+                <DropdownMenuItem
+                  onClick={() => handleDelete(entity.id.toString())}
+                >
                   <Trash2 className="mr-2 h-4 w-4" />
                   Delete
                 </DropdownMenuItem>
@@ -214,17 +217,19 @@ export default function HierarchyTable() {
 
   return (
     <>
-      <Table className="border">
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[300px]">Name</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead>Properties</TableHead>
-            <TableHead className="text-right w-[100px]">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>{renderRows(data)}</TableBody>
-      </Table>
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Properties</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>{renderRows(data)}</TableBody>
+        </Table>
+      </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">

@@ -2,156 +2,170 @@
 
 ## Technology Stack
 
-1. Frontend Framework
+- **Frontend Framework**: Next.js 14 with React 18, utilizing the App Router
+- **UI Framework**: Custom UI built on Radix UI primitives with Tailwind CSS
+- **State Management**: React's built-in hooks (useState, useContext)
+- **Type Safety**: TypeScript for strong typing
+- **Data Visualization**: Custom components for process flows and object hierarchies
+- **Component Library**: Reusable UI components with shadcn/ui conventions
 
-   - Next.js 15.2.4
-   - React 19
-   - TypeScript
+## Key Dependencies
 
-2. UI Libraries
+1. **UI Components**
 
-   - Tailwind CSS
-   - Radix UI Components
-   - Lucide React Icons
+   - Radix UI for accessible primitives
+   - Tailwind CSS for styling
+   - Lucide icons for iconography
+   - Shadcn/ui pattern for component organization
 
-3. Form Management
+2. **Data Management**
 
-   - React Hook Form
-   - Zod Validation
+   - React Hook Form for form handling
+   - Zod for schema validation
+   - UUID v7 for unique identifiers
+   - JSON for data structure
 
-4. Data Visualization
+3. **Visualization**
+   - Custom table components
+   - Hierarchical explorer views
+   - Column-based Kanban views
+   - Process flow visualization
 
-   - Recharts
+## Component Structure
 
-5. Security
-   - mTLS (Mutual TLS) Authentication
-   - Client certificates
-   - Secure API communication
+The application is structured around reusable components:
 
-## Project Structure
+```
+components/
+├── forms/              # Form components
+│   ├── process-form-v2.tsx
+│   ├── quick-object-form.tsx
+│   └── property-field.tsx
+├── modals/             # Modal dialogs
+│   ├── process-details-modal.tsx
+│   ├── property-management-modal.tsx
+│   └── delete-confirmation-dialog.tsx
+├── object-views/       # Object visualization
+│   ├── explorer-view.tsx
+│   ├── columns-view.tsx
+│   └── view-container.tsx
+├── sheets/             # Slide-in sheets
+│   ├── object-details-sheet.tsx
+│   ├── object-edit-sheet.tsx
+│   └── process-form-sheet.tsx
+├── tables/             # Table views
+│   ├── objects-table.tsx
+│   └── process-table.tsx
+└── ui/                 # Base UI components
+    ├── button.tsx
+    ├── dialog.tsx
+    ├── sheet.tsx
+    └── index.ts        # Centralized exports
+```
 
-1. Source Organization
+## Data Models
 
-   ```
-   src/
-   ├── app/                # Next.js app router pages
-   │   ├── page.tsx       # Auth page
-   │   ├── objects/       # Main application pages
-   │   ├── process/       # Process management pages
-   │   └── help/          # Help & documentation
-   ├── components/        # React components
-   │   ├── ui/           # Shared UI components
-   │   └── ...           # Feature components
-   ├── lib/              # Utilities
-   └── hooks/            # React hooks
-   ```
+### Object Model
 
-2. Path Configuration
-   - `@/*` aliases to `src/*`
-   - Direct imports from source
-   - Example: `@/components/ui/button`
+Objects follow a flexible property-based model:
 
-## Development Setup
+```typescript
+interface IoObject {
+  uuid: string // Unique identifier (UUIDv7)
+  name: string // Display name
+  type?: string // Object type classification
+  properties: Property[] // Flexible property list
+  children?: IoObject[] // Hierarchical structure
+  files?: File[] // Attached documents
+  createdAt: string // ISO timestamp
+  updatedAt: string // ISO timestamp
+}
+```
 
-1. Package Manager
+### Process Model
 
-   - pnpm
+Processes track material transformations:
 
-2. Development Tools
+```typescript
+interface Process {
+  uuid: string // Unique identifier
+  name: string // Process name
+  inputs: ProcessMaterial[] // Input materials with quantities
+  outputs: ProcessMaterial[] // Output materials with quantities
+  properties: Property[] // Process properties
+  createdAt: string // Creation timestamp
+  updatedAt: string // Update timestamp
+}
+```
 
-   - TypeScript
-   - ESLint
-   - PostCSS
-   - Tailwind CSS
+## Technical Implementation Details
 
-3. Build Tools
+1. **Component Imports**
 
-   - Next.js Build System
-   - PostCSS
-   - Tailwind CSS
+   - Using index.ts for centralized exports
+   - Clean imports from UI components
+   - Consistent module organization
 
-4. Security Tools
-   - Certificate management
-   - mTLS configuration
-   - Browser certificate storage
+2. **UUID Generation**
+
+   - Using UUID v7 for time-based ordering
+   - Generated client-side for new objects
+   - Used for relationship tracking
+
+3. **Form Handling**
+
+   - Controlled components with React state
+   - Dynamic form fields for properties
+   - Template-based quick object creation
+
+4. **View Navigation**
+   - Multiple view types (table, explorer, columns)
+   - Consistent action patterns across views
+   - Hierarchical navigation for nested objects
 
 ## Technical Constraints
 
-1. Browser Support
+1. **Performance Considerations**
 
-   - Modern browsers with Web Crypto API support
-   - Certificate storage capabilities
-   - Secure context (HTTPS) required
+   - Large object hierarchies might impact rendering
+   - Complex process visualizations need optimization
+   - State management for deeply nested objects
 
-2. Performance
+2. **Browser Compatibility**
 
-   - Client-side rendering
-   - Optimized bundle size
-   - Efficient state management
+   - Modern browser support only (Chrome, Firefox, Safari, Edge)
+   - Reliance on modern CSS features
+   - ES6+ JavaScript features
 
-3. Security
+3. **Data Persistence**
+   - Currently using in-memory data
+   - Prepared for API integration
+   - UUID-based relationships for future backend
 
-   - mTLS certificate validation
-   - Secure certificate storage
-   - Certificate lifecycle management
+## Development Environment
 
-4. Accessibility
-   - WCAG compliance
-   - Keyboard navigation
-   - Screen reader support
+- **Node.js**: v18+ environment
+- **Package Manager**: npm or yarn
+- **Development Server**: Next.js dev server
+- **Build System**: Next.js build system
+- **Deployment Target**: Static site or Node.js server
 
-## Dependencies
+## Future Technical Considerations
 
-1. Core Dependencies
+1. **Data Persistence**
 
-   - next
-   - react
-   - react-dom
-   - typescript
+   - API integration for data storage
+   - Real-time updates with WebSockets
+   - Offline support with local storage
 
-2. UI Dependencies
+2. **Performance Optimizations**
 
-   - @radix-ui/\* components
-   - tailwindcss
-   - lucide-react
+   - Virtual lists for large data sets
+   - Optimistic UI updates
+   - Incremental static regeneration
 
-3. Security Dependencies
-
-   - node-forge (for certificate handling)
-   - @peculiar/x509 (for certificate parsing)
-   - web-crypto-tools
-
-4. Utility Dependencies
-   - date-fns
-   - zod
-   - react-hook-form
-   - recharts
-
-## Authentication Flow
-
-1. Certificate Management
-
-   - Browser certificate store integration
-   - Certificate selection UI
-   - Certificate validation
-
-2. API Communication
-
-   - Secure WebSocket connections
-   - HTTPS requests with client certificates
-   - Certificate error handling
-
-3. User Experience
-   - Certificate installation guide
-   - Certificate status indicators
-   - Error recovery flows
-
-## Routing Structure
-
-1. Main Routes
-   - `/` - Authentication page
-   - `/objects` - Objects list view
-   - `/objects/[uuid]` - Object details
-   - `/process` - Process list view
-   - `/process/[uuid]` - Process details
-   - `/help` - Help & documentation
+3. **Advanced Features**
+   - Advanced process visualization
+   - Material flow analysis
+   - Data import/export capabilities
+   - Reporting and analytics

@@ -2,16 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { HelpCircle, ArrowRight, Check, Clock } from 'lucide-react'
+import { HelpCircle, ArrowRight, Check } from 'lucide-react'
 import Link from 'next/link'
 
-import { Card } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { useCertificate } from '@/contexts/certificate-context'
+import { Card, Button } from '@/components/ui'
 
 export default function AuthPage() {
   const router = useRouter()
-  const { lastAuthSuccess, logout } = useCertificate()
   const [status, setStatus] = useState<
     'idle' | 'authorizing' | 'success' | 'error'
   >('idle')
@@ -78,20 +75,6 @@ export default function AuthPage() {
     }
   }
 
-  // Format the last authentication time
-  const formatAuthTime = (date: Date | null) => {
-    if (!date) return ''
-
-    // If today, show only time
-    const today = new Date()
-    if (date.toDateString() === today.toDateString()) {
-      return `Today at ${date.toLocaleTimeString()}`
-    }
-
-    // Otherwise, show date and time
-    return date.toLocaleString()
-  }
-
   return (
     <div className="flex flex-1 items-center justify-center bg-gray-50">
       <div className="max-w-md w-full space-y-6 p-8">
@@ -107,12 +90,6 @@ export default function AuthPage() {
             {status === 'idle' && (
               <>
                 <div className="space-y-4">
-                  {lastAuthSuccess && (
-                    <div className="flex items-center text-sm text-gray-500 mb-2">
-                      <Clock className="h-4 w-4 mr-2" />
-                      <span>Last login: {formatAuthTime(lastAuthSuccess)}</span>
-                    </div>
-                  )}
                   <p className="text-sm text-gray-600">
                     To access the system, you need a valid certificate. Click
                     the button below to start the authorization process.

@@ -2,111 +2,111 @@
 
 ## Current Focus
 
-1. Authentication System
+1. Process Flow Management
 
-   - Certificate-based authentication
-   - Browser certificate integration
-   - Help documentation
-   - User guidance
+   - Material flow tracking between objects
+   - Input/output relationships
+   - Process visualization
+   - Property management
 
-2. Project Structure
-   - Source organization in `src`
-   - Clean import paths
-   - Component organization
-   - Feature modularity
+2. UI Consistency
+   - Consistent component usage across the application
+   - Sheet components for details/edit views
+   - Action buttons in table views
+   - Modal scrolling behavior
 
 ## Recent Changes
 
-1. Core Structure
+1. Process Flow System
 
-   - Moved code to `src` directory
-   - Updated path aliases
-   - Implemented auth page
-   - Added help system
+   - Added ProcessFormV2 with improved UI
+   - Created QuickObjectForm for rapid material creation
+   - Implemented input/output quantity tracking
+   - Added intelligent suggestions for outputs
 
-2. Components
-   - Added CertificateSelector
-   - Implemented auth flow
-   - Created help documentation
-   - Enhanced error handling
+2. UI Components
+   - Updated modal components to use scrollable content
+   - Standardized table views with consistent action buttons
+   - Unified import structure using index.ts files
+   - Consistent sheet usage for object editing/viewing
 
 ## Next Steps
 
 1. Immediate Tasks
 
-   - Complete mTLS integration
-   - Enhance certificate validation
-   - Add more help documentation
-   - Improve error messages
+   - Complete process flow visualization
+   - Enhance material relationship tracking
+   - Improve table responsiveness
+   - Add more material templates
 
 2. Future Improvements
-   - Add certificate expiration notifications
-   - Implement certificate renewal flow
-   - Add advanced search
-   - Enhance data visualization
+   - Add process flow diagram visualization
+   - Implement material history tracking
+   - Add advanced property management
+   - Enhance data validation
 
 ## Active Decisions
 
 1. Architecture
 
-   - Using `src` directory structure
-   - Path aliases for clean imports
-   - Component-based architecture
-   - Feature-based organization
+   - Using index.ts for component exports
+   - Sheet components for detailed views
+   - Modal components for confirmations
+   - Consistent action patterns across tables
 
-2. Authentication
+2. Object Management
 
-   - Browser certificate management
-   - mTLS implementation
-   - Session handling
-   - Error recovery
+   - Hierarchical object structure
+   - UUID-based identification
+   - Property-based metadata
+   - Flow-based relationships
 
 3. UI/UX
-   - Certificate selection flow
-   - Help documentation
-   - Error messages
-   - Loading states
+   - Dropdown menus for table row actions
+   - Consistent edit/view patterns
+   - Scrollable content in modals/sheets
+   - Template-based object creation
 
 ## Current Challenges
 
 1. Technical
 
-   - mTLS implementation details
-   - Certificate validation
-   - Error handling
-   - Performance optimization
+   - Complex state management for object relationships
+   - Performance with large object hierarchies
+   - Property validation across different objects
+   - Consistent data handling
 
 2. UX/UI
 
-   - Certificate selection UX
-   - Help documentation clarity
-   - Error message clarity
-   - Loading state feedback
+   - Balancing detail vs simplicity in process forms
+   - Maintaining consistency across different views
+   - Effective visualization of material flows
+   - User-friendly property management
 
-3. Documentation
-   - Installation guides
-   - Usage instructions
-   - Error troubleshooting
-   - Certificate management
+3. Data Structure
+   - Representing complex material relationships
+   - Tracking quantities throughout processes
+   - Maintaining history of material transformations
+   - Ensuring data integrity
 
 ## Development Focus
 
 1. Priority Features
 
-   - Authentication system
-   - Certificate management
-   - Help documentation
-   - Error handling
+   - Process flow management
+   - Material transformation tracking
+   - Object relationship visualization
+   - Property management
 
 2. Code Quality
 
-   - Clean imports
-   - Component organization
-   - Type safety
-   - Error boundaries
+   - Consistent component patterns
+   - Clean imports through index files
+   - Type safety for objects and properties
+   - Reusable UI components
 
 3. User Experience
-   - Clear guidance
-   - Helpful error messages
-   - Intuitive flows
-   - Responsive design
+   - Streamlined process creation
+   - Consistent object management
+   - Intuitive material flow visualization
+   - Responsive and accessible interfaces
