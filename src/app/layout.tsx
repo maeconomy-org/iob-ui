@@ -6,6 +6,7 @@ import Footer from '@/components/footer'
 import { Toaster } from '@/components/ui/toaster'
 import ClientLayout from '@/components/client-layout'
 import { SearchProvider } from '@/contexts/search-context'
+import { QueryProvider } from '@/providers/query-provider'
 import { APP_NAME, APP_DESCRIPTION } from '@/constants'
 
 export const metadata: Metadata = {
@@ -27,11 +28,13 @@ export default function RootLayout({
       className={`${inter.className} h-full`}
     >
       <body className="flex flex-col min-h-screen h-full">
-        <SearchProvider>
-          <ClientLayout>{children}</ClientLayout>
-          <Footer />
-          <Toaster />
-        </SearchProvider>
+        <QueryProvider>
+          <SearchProvider>
+            <ClientLayout>{children}</ClientLayout>
+            <Footer />
+            <Toaster />
+          </SearchProvider>
+        </QueryProvider>
       </body>
     </html>
   )

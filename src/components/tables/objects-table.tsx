@@ -11,6 +11,7 @@ import {
   Pencil,
   Trash2,
   MoreHorizontal,
+  QrCode,
 } from 'lucide-react'
 
 import { objectsData } from '@/lib/data'
@@ -28,6 +29,7 @@ import {
   TableRow,
 } from '@/components/ui'
 import { DeleteConfirmationDialog } from '@/components/modals'
+import { QRCodeModal } from '@/components/modals'
 
 interface ObjectsTableProps {
   initialData?: any[]
@@ -36,6 +38,28 @@ interface ObjectsTableProps {
   onViewObject?: (object: any) => void
   onEditObject?: (object: any) => void
   onSaveObject?: (object: any) => void
+}
+
+const isObjectDeleted = (object: any) => {
+  // Check if object has a system:softDeleted property with value true
+  if (!object || !object.properties) return false
+
+  const softDeletedProp = object.properties.find(
+    (p: any) =>
+      p.property?.key === 'system:softDeleted' || p.key === 'system:softDeleted'
+  )
+
+  if (!softDeletedProp) return false
+
+  // Check the value - could be in different formats depending on API
+  // Look for the value in the values array first
+  if (softDeletedProp.values && softDeletedProp.values.length > 0) {
+    const valueObj = softDeletedProp.values[0]
+    return valueObj.value === true || valueObj.value === 'true'
+  }
+
+  // Or check direct value property
+  return softDeletedProp.value === true || softDeletedProp.value === 'true'
 }
 
 export function ObjectsTable({
@@ -52,6 +76,8 @@ export function ObjectsTable({
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({})
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [objectToDelete, setObjectToDelete] = useState<any>(null)
+  const [isQRCodeModalOpen, setIsQRCodeModalOpen] = useState(false)
+  const [selectedQRObject, setSelectedQRObject] = useState<any>(null)
 
   // Load data from props or from the data file
   useEffect(() => {
@@ -65,7 +91,9 @@ export function ObjectsTable({
 
   const handleViewDetails = (object: any) => {
     if (onViewObject) {
-      onViewObject(object)
+      if (object && object.uuid) {
+        onViewObject(object)
+      }
     }
   }
 
@@ -88,6 +116,12 @@ export function ObjectsTable({
     }
 
     setData(updateObject(data))
+  }
+
+  const handleShowQRCode = (object: any, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setSelectedQRObject(object)
+    setIsQRCodeModalOpen(true)
   }
 
   const toggleRow = (uuid: string, e: React.MouseEvent) => {
@@ -120,14 +154,14 @@ export function ObjectsTable({
     return objects.flatMap((object) => {
       const hasChildren = object.children && object.children.length > 0
       const isExpanded = expandedRows[object.uuid]
-      const isDeleted = object.isDeleted
+      const isDeleted = isObjectDeleted(object)
 
       const rows = [
         <TableRow
           key={object.uuid}
           onDoubleClick={() => handleRowDoubleClick(object)}
           className={`cursor-pointer hover:bg-muted/50 ${
-            isDeleted ? 'bg-red-50' : ''
+            isDeleted ? 'bg-destructive/10' : ''
           }`}
         >
           <TableCell className="font-medium">
@@ -151,13 +185,13 @@ export function ObjectsTable({
               )}
               <span
                 className={`truncate max-w-[200px] ${
-                  isDeleted ? 'line-through text-muted-foreground' : ''
+                  isDeleted ? 'line-through text-destructive' : ''
                 }`}
               >
                 {object.name}
               </span>
               {isDeleted && (
-                <span className="ml-2 text-xs text-red-500">(Deleted)</span>
+                <span className="ml-2 text-xs text-destructive">(Deleted)</span>
               )}
             </div>
           </TableCell>
@@ -165,6 +199,16 @@ export function ObjectsTable({
             {object.uuid}
           </TableCell>
           <TableCell>{formatDate(object.createdAt)}</TableCell>
+          <TableCell>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={(e) => handleShowQRCode(object, e)}
+              title="Show QR Code"
+            >
+              <QrCode className="h-4 w-4" />
+            </Button>
+          </TableCell>
           <TableCell className="text-right">
             <div className="flex justify-end gap-1">
               <Button
@@ -197,6 +241,16 @@ export function ObjectsTable({
                   >
                     <FileText className="mr-2 h-4 w-4" />
                     View Details
+                  </DropdownMenuItem>
+
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleShowQRCode(object, e)
+                    }}
+                  >
+                    <QrCode className="mr-2 h-4 w-4" />
+                    Show QR Code
                   </DropdownMenuItem>
 
                   {onEditObject && (
@@ -250,7 +304,8 @@ export function ObjectsTable({
             <TableRow>
               <TableHead>Name</TableHead>
               <TableHead>UUID</TableHead>
-              <TableHead>Created At</TableHead>
+              <TableHead>Created</TableHead>
+              <TableHead>QR Code</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -265,9 +320,19 @@ export function ObjectsTable({
         onDelete={() => {
           if (objectToDelete) {
             handleDelete(objectToDelete.uuid)
+            setIsDeleteModalOpen(false)
           }
         }}
       />
+
+      {selectedQRObject && (
+        <QRCodeModal
+          isOpen={isQRCodeModalOpen}
+          onClose={() => setIsQRCodeModalOpen(false)}
+          uuid={selectedQRObject.uuid}
+          objectName={selectedQRObject.name}
+        />
+      )}
     </>
   )
 }

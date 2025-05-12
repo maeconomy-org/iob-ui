@@ -64,7 +64,7 @@ export function ObjectEditSheet({
       abbreviation: '',
       version: '',
       description: '',
-      parentUuid: '',
+      parentUuid: undefined,
       properties: [],
       files: [],
       modelUuid: '',
@@ -117,7 +117,7 @@ export function ObjectEditSheet({
         abbreviation: object.abbreviation || '',
         version: object.version || '',
         description: object.description || '',
-        parentUuid: object.parentUuid || '',
+        parentUuid: object.parentUuid || undefined,
         properties:
           convertedProperties.length > 0
             ? convertedProperties
@@ -133,7 +133,7 @@ export function ObjectEditSheet({
         abbreviation: '',
         version: '',
         description: '',
-        parentUuid: '',
+        parentUuid: undefined,
         properties: [createEmptyProperty()],
         files: [],
         modelUuid: '',
