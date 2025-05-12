@@ -106,6 +106,7 @@ function TreeItem({
   const isSelected = selectedItem?.uuid === item.uuid
   const hasChildren = item.children && item.children.length > 0
   const indent = level * 16
+  const isDeleted = isObjectDeleted(item)
 
   // Find model info if applicable
   const model = item.modelUuid
@@ -142,7 +143,9 @@ function TreeItem({
   return (
     <>
       <div
-        className={`flex items-center px-2 py-1.5 hover:bg-muted/50 cursor-pointer rounded-sm ${isSelected ? 'bg-muted' : ''}`}
+        className={`flex items-center px-2 py-1.5 hover:bg-muted/50 cursor-pointer rounded-sm ${
+          isSelected ? 'bg-muted' : ''
+        } ${isDeleted ? 'bg-destructive/10' : ''}`}
         onClick={handleSelect}
       >
         <div
@@ -168,7 +171,15 @@ function TreeItem({
             {getIcon()}
           </div>
 
-          <span className="text-sm truncate">{item.name}</span>
+          <span
+            className={`text-sm truncate ${isDeleted ? 'line-through text-destructive' : ''}`}
+          >
+            {item.name}
+          </span>
+
+          {isDeleted && (
+            <span className="ml-2 text-xs text-destructive">(Deleted)</span>
+          )}
 
           {model && (
             <Badge variant="outline" className="ml-2 text-xs py-0 h-4">
@@ -187,15 +198,19 @@ function TreeItem({
             <DropdownMenuItem onClick={() => onViewDetails(item)}>
               View Details
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onEdit(item)}>
-              Edit
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => onDelete(item)}
-              className="text-destructive"
-            >
-              Delete
-            </DropdownMenuItem>
+            {!isDeleted && (
+              <>
+                <DropdownMenuItem onClick={() => onEdit(item)}>
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => onDelete(item)}
+                  className="text-destructive"
+                >
+                  Delete
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -525,6 +540,29 @@ function DetailsPanel({
   )
 }
 
+// Check if an object is soft deleted based on system properties
+const isObjectDeleted = (object: any) => {
+  // Check if object has a system:softDeleted property with value true
+  if (!object || !object.properties) return false
+
+  const softDeletedProp = object.properties.find(
+    (p: any) =>
+      p.property?.key === 'system:softDeleted' || p.key === 'system:softDeleted'
+  )
+
+  if (!softDeletedProp) return false
+
+  // Check the value - could be in different formats depending on API
+  // Look for the value in the values array first
+  if (softDeletedProp.values && softDeletedProp.values.length > 0) {
+    const valueObj = softDeletedProp.values[0]
+    return valueObj.value === true || valueObj.value === 'true'
+  }
+
+  // Or check direct value property
+  return softDeletedProp.value === true || softDeletedProp.value === 'true'
+}
+
 export function ObjectExplorerView({
   data,
   availableModels,
@@ -628,9 +666,8 @@ export function ObjectExplorerView({
   }
 
   const handleDeleteConfirm = (uuid: string) => {
-    // Implement delete logic here
     console.log('Deleting object:', uuid)
-    // You would typically update your data state here
+    // TODO: Implement delete logic here using the iob-client
   }
 
   const handlePropertyClick = (property: any) => {

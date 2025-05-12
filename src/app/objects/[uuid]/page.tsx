@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import { Info, PlusCircle } from 'lucide-react'
+import { toast } from 'sonner'
 
 import { Button } from '@/components/ui'
 import Breadcrumbs from '@/components/breadcrumbs'
@@ -10,9 +11,15 @@ import { ObjectsTable } from '@/components/tables'
 import { objectsData, objectModelsData } from '@/lib/data'
 import { DeleteConfirmationDialog } from '@/components/modals'
 import { ObjectDetailsSheet, ObjectEditSheet } from '@/components/sheets'
+import { useObjects } from '@/hooks'
 
 export default function ObjectChildrenPage() {
   const params = useParams()
+  const { useUpdateObject, useDeleteObject } = useObjects()
+
+  const updateObjectMutation = useUpdateObject()
+  const deleteObject = useDeleteObject()
+
   const [parentObject, setParentObject] = useState<any>(null)
   const [childrenData, setChildrenData] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -28,6 +35,24 @@ export default function ObjectChildrenPage() {
   const [objectSheetMode, setObjectSheetMode] = useState<'add' | 'edit'>('add')
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [objectToDelete, setObjectToDelete] = useState<any>(null)
+
+  // Function to check if an object is deleted
+  const isObjectDeleted = (object: any) => {
+    // Check if the object is marked as deleted in its metadata
+    return object?.metadata?.deleted === true
+  }
+
+  // Handle object deletion
+  const handleDeleteObject = async (objectUuid: string) => {
+    try {
+      await deleteObject.mutateAsync(objectUuid)
+      setIsObjectSheetOpen(false)
+      toast.success('Object has been moved to trash')
+    } catch (err) {
+      console.error('Error deleting object:', err)
+      toast.error('Failed to delete object')
+    }
+  }
 
   useEffect(() => {
     const uuid = params.uuid as string
@@ -92,13 +117,6 @@ export default function ObjectChildrenPage() {
       )
     }
     setIsObjectEditSheetOpen(false)
-  }
-
-  const handleDeleteObject = (objectToRemove: any) => {
-    setChildrenData(
-      childrenData.filter((child) => child.uuid !== objectToRemove.uuid)
-    )
-    setIsObjectSheetOpen(false)
   }
 
   if (isLoading) {
@@ -174,13 +192,13 @@ export default function ObjectChildrenPage() {
         isOpen={isParentDetailsSheetOpen}
         onClose={() => setIsParentDetailsSheetOpen(false)}
         object={parentObject}
+        uuid={parentObject?.uuid}
         availableModels={objectModelsData}
         onEdit={() => {
           // Handle parent editing if needed
         }}
-        onDelete={() => {
-          // Handle parent deletion if needed
-        }}
+        onDelete={(objectId) => handleDeleteObject(objectId)}
+        isDeleted={isObjectDeleted(parentObject)}
       />
 
       {/* Child Object Details Sheet */}
@@ -188,16 +206,15 @@ export default function ObjectChildrenPage() {
         isOpen={isObjectSheetOpen}
         onClose={() => setIsObjectSheetOpen(false)}
         object={selectedObject}
+        uuid={selectedObject?.uuid}
         availableModels={objectModelsData}
         onEdit={() => {
           setIsObjectSheetOpen(false)
           setObjectSheetMode('edit')
           setIsObjectEditSheetOpen(true)
         }}
-        onDelete={(object) => {
-          setObjectToDelete(object)
-          setIsDeleteModalOpen(true)
-        }}
+        onDelete={(objectId) => handleDeleteObject(objectId)}
+        isDeleted={isObjectDeleted(selectedObject)}
       />
 
       {/* Add/Edit Child Object Sheet */}
@@ -215,8 +232,9 @@ export default function ObjectChildrenPage() {
         onOpenChange={setIsDeleteModalOpen}
         objectName={objectToDelete?.name || 'this child object'}
         onDelete={() => {
+          console.log('objectToDelete', objectToDelete)
           if (objectToDelete) {
-            handleDeleteObject(objectToDelete)
+            handleDeleteObject(objectToDelete.uuid)
             setIsDeleteModalOpen(false)
             setObjectToDelete(null)
           }

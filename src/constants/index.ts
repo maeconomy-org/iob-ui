@@ -1,7 +1,7 @@
 // App information
 export const APP_NAME = 'Internet of Buildings'
 export const APP_DESCRIPTION = 'Material Management System'
-export const APP_ACRONYM = 'CDB'
+export const APP_ACRONYM = 'IoB'
 
 // Auth-related
 export const AUTH_ENDPOINT = 'https://maeconomy.recheck.io:9443/api/UUObject'

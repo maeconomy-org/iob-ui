@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { FileText, Edit, Trash2 } from 'lucide-react'
+import { FileText, Edit, Trash2, Loader2 } from 'lucide-react'
 
 import {
   FileManagementModal,
@@ -19,32 +19,48 @@ import {
   SheetTitle,
   SheetFooter,
 } from '@/components/ui'
+import { useObjects } from '@/hooks'
 
 interface ObjectSheetProps {
   isOpen: boolean
   onClose: () => void
-  object?: any
+  object?: any // Optional fallback object data
+  uuid?: string // Object UUID to fetch from API
   availableModels: any[]
   onDelete?: (objectId: string) => void
   onEdit?: () => void
+  isDeleted?: boolean
 }
 
 export function ObjectDetailsSheet({
   isOpen,
   onClose,
-  object,
+  object: initialObject,
+  uuid,
   availableModels = [],
   onDelete,
   onEdit,
+  isDeleted,
 }: ObjectSheetProps) {
+  // Get the useFullObject hook to fetch the complete object data
+  const { useFullObject } = useObjects()
+
+  // Fetch the full object details if a UUID is provided
+  const { data: fullObject, isLoading } = useFullObject(uuid || '', {
+    enabled: !!uuid && isOpen,
+  })
+
+  // Use the API data if available, otherwise fall back to the passed object
+  const object = fullObject || initialObject
+
   // State for property and file management
   const [isPropertyModalOpen, setIsPropertyModalOpen] = useState(false)
   const [isFileModalOpen, setIsFileModalOpen] = useState(false)
   const [selectedProperty, setSelectedProperty] = useState<any>(null)
   const [isPropertyDetailsOpen, setIsPropertyDetailsOpen] = useState(false)
 
-  // Exit early if no object
-  if (!object && isOpen) {
+  // Exit early if no object and still loading
+  if (!object && isOpen && !isLoading) {
     return null
   }
 
@@ -95,7 +111,7 @@ export function ObjectDetailsSheet({
       <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
         <SheetContent className="sm:max-w-xl overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>{object?.name}</SheetTitle>
+            <SheetTitle>{initialObject?.name}</SheetTitle>
             {model && (
               <SheetDescription>
                 <Badge variant="outline">
@@ -105,183 +121,217 @@ export function ObjectDetailsSheet({
             )}
           </SheetHeader>
 
-          <div className="space-y-6 py-6">
-            {/* Metadata Section */}
-            <div>
-              <div className="grid grid-cols-1 gap-3">
-                <div>
-                  <div className="text-sm font-medium">UUID</div>
-                  <div className="text-sm font-mono text-muted-foreground">
-                    {object?.uuid}
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <div className="text-sm font-medium">Name</div>
-                    <div className="text-sm text-muted-foreground">
-                      {object?.name}
-                    </div>
-                  </div>
-                  {object?.abbreviation && (
-                    <div>
-                      <div className="text-sm font-medium">Abbreviation</div>
-                      <div className="text-sm text-muted-foreground">
-                        {object?.abbreviation}
-                      </div>
-                    </div>
-                  )}
-                  {object?.version && (
-                    <div>
-                      <div className="text-sm font-medium">Version</div>
-                      <div className="text-sm text-muted-foreground">
-                        {object?.version}
-                      </div>
-                    </div>
-                  )}
-                  {object?.description && (
-                    <div>
-                      <div className="text-sm font-medium">Description</div>
-                      <div className="text-sm text-muted-foreground">
-                        {object?.description}
-                      </div>
-                    </div>
-                  )}
-                  <div>
-                    <div className="text-sm font-medium">Created</div>
-                    <div className="text-sm text-muted-foreground">
-                      {object?.createdAt &&
-                        new Date(object.createdAt).toLocaleString()}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium">Updated</div>
-                    <div className="text-sm text-muted-foreground">
-                      {object?.updatedAt &&
-                        new Date(object.updatedAt).toLocaleString()}
-                    </div>
-                  </div>
-                </div>
-              </div>
+          {isLoading ? (
+            <div className="flex justify-center items-center h-full">
+              <Loader2 className="h-4 w-4 animate-spin" />
             </div>
-
-            {/* Properties Section */}
-            <Separator />
-            <div>
-              <div className="flex justify-between items-center mb-3">
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                  Properties
-                </h3>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleManageProperties}
-                >
-                  Manage Properties
-                </Button>
-              </div>
-
-              {object?.properties && object.properties.length > 0 ? (
-                <div className="space-y-2">
-                  {object.properties.map((prop: any, idx: number) => (
-                    <div
-                      key={prop.uuid || idx}
-                      className="grid grid-cols-3 gap-2 py-1 border-b border-muted last:border-0 hover:bg-muted/20 cursor-pointer"
-                      onClick={() => handlePropertyClick(prop)}
-                    >
-                      <div className="font-medium text-sm">{prop.key}</div>
-                      <div className="col-span-2 text-sm">
-                        {formatPropertyValue(prop)}
+          ) : (
+            <div className="space-y-6 py-6">
+              {/* Metadata Section */}
+              <div>
+                <div className="grid grid-cols-1 gap-3">
+                  <div>
+                    <div className="text-sm font-medium">UUID</div>
+                    <div className="text-sm font-mono text-muted-foreground">
+                      {initialObject?.uuid}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <div className="text-sm font-medium">Name</div>
+                      <div className="text-sm text-muted-foreground">
+                        {initialObject?.name}
                       </div>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-sm text-muted-foreground bg-muted/20 rounded-md p-3">
-                  No properties defined for this object
-                </div>
-              )}
-            </div>
-
-            {/* Files Section */}
-            <Separator />
-            <div>
-              <div className="flex justify-between items-center mb-3">
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                  Files
-                </h3>
-                <Button variant="outline" size="sm" onClick={handleManageFiles}>
-                  Manage Files
-                </Button>
-              </div>
-
-              {object?.files && object.files.length > 0 ? (
-                <div className="space-y-2">
-                  {object.files.map((file: any, idx: number) => (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between py-1 border-b border-muted last:border-0"
-                    >
-                      <div className="flex items-center">
-                        <FileText className="h-4 w-4 mr-2 text-muted-foreground" />
-                        <span className="text-sm">{file.name}</span>
+                    {initialObject?.abbreviation && (
+                      <div>
+                        <div className="text-sm font-medium">Abbreviation</div>
+                        <div className="text-sm text-muted-foreground">
+                          {initialObject?.abbreviation}
+                        </div>
                       </div>
-                      <span className="text-xs text-muted-foreground">
-                        {file.size}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-sm text-muted-foreground bg-muted/20 rounded-md p-3">
-                  No files attached to this object
-                </div>
-              )}
-            </div>
-
-            {/* Model Section (if applicable) */}
-            {model && (
-              <>
-                <Separator />
-                <div>
-                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                    Model Details
-                  </h3>
-                  <div className="space-y-2 bg-primary/5 rounded-md p-3">
-                    <div className="grid grid-cols-3 gap-2 py-1 border-b border-muted/40 last:border-0">
-                      <div className="font-medium text-sm">Name</div>
-                      <div className="col-span-2 text-sm">{model.name}</div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 py-1 border-b border-muted/40 last:border-0">
-                      <div className="font-medium text-sm">Abbreviation</div>
-                      <div className="col-span-2 text-sm">
-                        {model.abbreviation || 'N/A'}
+                    )}
+                    {initialObject?.version && (
+                      <div>
+                        <div className="text-sm font-medium">Version</div>
+                        <div className="text-sm text-muted-foreground">
+                          {initialObject?.version}
+                        </div>
+                      </div>
+                    )}
+                    {initialObject?.description && (
+                      <div>
+                        <div className="text-sm font-medium">Description</div>
+                        <div className="text-sm text-muted-foreground">
+                          {initialObject?.description}
+                        </div>
+                      </div>
+                    )}
+                    <div>
+                      <div className="text-sm font-medium">Created</div>
+                      <div className="text-sm text-muted-foreground">
+                        {initialObject?.createdAt &&
+                          new Date(initialObject.createdAt).toLocaleString()}
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-2 py-1 border-b border-muted/40 last:border-0">
-                      <div className="font-medium text-sm">Version</div>
-                      <div className="col-span-2 text-sm">
-                        {model.version || 'N/A'}
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 py-1 border-b border-muted/40 last:border-0">
-                      <div className="font-medium text-sm">Description</div>
-                      <div className="col-span-2 text-sm">
-                        {model.description || 'No description'}
-                      </div>
-                    </div>
-                    {model.creator && (
-                      <div className="grid grid-cols-3 gap-2 py-1 border-b border-muted/40 last:border-0">
-                        <div className="font-medium text-sm">Created By</div>
-                        <div className="col-span-2 text-sm">
-                          {model.creator}
+                    {initialObject?.updatedAt && (
+                      <div>
+                        <div className="text-sm font-medium">Updated</div>
+                        <div className="text-sm text-muted-foreground">
+                          {new Date(
+                            initialObject.lastUpdatedAt
+                          ).toLocaleString()}
                         </div>
                       </div>
                     )}
                   </div>
+                  {/* Display soft delete metadata if object is deleted */}
+                  {isDeleted && (
+                    <>
+                      <div>
+                        <div className="text-sm font-medium text-destructive">
+                          Deleted At
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {initialObject?.deletedAt &&
+                            new Date(initialObject.deletedAt).toLocaleString()}
+                        </div>
+                      </div>
+                      {initialObject?.deletedBy && (
+                        <div>
+                          <div className="text-sm font-medium text-destructive">
+                            Deleted By
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {initialObject.deletedBy}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
-              </>
-            )}
-          </div>
+              </div>
+
+              {/* Properties Section */}
+              <Separator />
+              <div>
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                    Properties
+                  </h3>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleManageProperties}
+                  >
+                    Manage Properties
+                  </Button>
+                </div>
+
+                {object?.properties && object.properties.length > 0 ? (
+                  <div className="space-y-2">
+                    {object.properties.map((prop: any, idx: number) => (
+                      <div
+                        key={prop.uuid || idx}
+                        className="grid grid-cols-3 gap-2 py-1 border-b border-muted last:border-0 hover:bg-muted/20 cursor-pointer"
+                        onClick={() => handlePropertyClick(prop)}
+                      >
+                        <div className="font-medium text-sm">{prop.key}</div>
+                        <div className="col-span-2 text-sm">
+                          {formatPropertyValue(prop)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground bg-muted/20 rounded-md p-3">
+                    No properties defined for this object
+                  </div>
+                )}
+              </div>
+
+              {/* Files Section */}
+              <Separator />
+              <div>
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                    Files
+                  </h3>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleManageFiles}
+                  >
+                    Manage Files
+                  </Button>
+                </div>
+
+                {object?.files && object.files.length > 0 ? (
+                  <div className="space-y-2">
+                    {object.files.map((file: any, idx: number) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between py-1 border-b border-muted last:border-0"
+                      >
+                        <div className="flex items-center">
+                          <FileText className="h-4 w-4 mr-2 text-muted-foreground" />
+                          <span className="text-sm">{file.label}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground bg-muted/20 rounded-md p-3">
+                    No files attached to this object
+                  </div>
+                )}
+              </div>
+
+              {/* Model Section (if applicable) */}
+              {model && (
+                <>
+                  <Separator />
+                  <div>
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                      Model Details
+                    </h3>
+                    <div className="space-y-2 bg-primary/5 rounded-md p-3">
+                      <div className="grid grid-cols-3 gap-2 py-1 border-b border-muted/40 last:border-0">
+                        <div className="font-medium text-sm">Name</div>
+                        <div className="col-span-2 text-sm">{model.name}</div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 py-1 border-b border-muted/40 last:border-0">
+                        <div className="font-medium text-sm">Abbreviation</div>
+                        <div className="col-span-2 text-sm">
+                          {model.abbreviation || 'N/A'}
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 py-1 border-b border-muted/40 last:border-0">
+                        <div className="font-medium text-sm">Version</div>
+                        <div className="col-span-2 text-sm">
+                          {model.version || 'N/A'}
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 py-1 border-b border-muted/40 last:border-0">
+                        <div className="font-medium text-sm">Description</div>
+                        <div className="col-span-2 text-sm">
+                          {model.description || 'No description'}
+                        </div>
+                      </div>
+                      {model.creator && (
+                        <div className="grid grid-cols-3 gap-2 py-1 border-b border-muted/40 last:border-0">
+                          <div className="font-medium text-sm">Created By</div>
+                          <div className="col-span-2 text-sm">
+                            {model.creator}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
 
           <SheetFooter className="border-t pt-4">
             <div className="flex w-full justify-between items-center gap-2">
@@ -289,7 +339,7 @@ export function ObjectDetailsSheet({
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => onDelete(object.uuid)}
+                  onClick={() => onDelete(initialObject.uuid)}
                   className="text-destructive"
                 >
                   <Trash2 className="h-4 w-4 mr-2" />

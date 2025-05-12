@@ -41,17 +41,27 @@ export default function AuthPage() {
 
     try {
       // Initiate auth flow
-      const response = await fetch(
-        'https://maeconomy.recheck.io:9443/api/UUObject',
+      const mainServerResponse = await fetch(
+        'https://maeconomy.recheck.io:9443/api/cert',
         {
           method: 'GET',
           credentials: 'include', // Important for certificate handling
         }
       )
 
-      console.log(response)
+      if (!mainServerResponse.ok) {
+        throw new Error('Authorization failed')
+      }
 
-      if (!response.ok) {
+      const uuidServerResponse = await fetch(
+        'https://maeconomy.recheck.io:8443/api/UUIDOwner',
+        {
+          method: 'GET',
+          credentials: 'include', // Important for certificate handling
+        }
+      )
+
+      if (!uuidServerResponse.ok) {
         throw new Error('Authorization failed')
       }
 
