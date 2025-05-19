@@ -18,7 +18,7 @@ export function useObjects() {
     return useQuery({
       queryKey: ['objects'],
       queryFn: async () => {
-        const response = await client.objects.api.getAll()
+        const response = await client.objects.api.getOwn()
         return response.data
       },
       ...options,

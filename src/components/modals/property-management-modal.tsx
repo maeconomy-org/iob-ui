@@ -93,19 +93,33 @@ export function PropertyManagementModal({
   const handleAddProperty = () => {
     if (!newPropertyKey.trim()) return
 
-    // Create the new property with values
+    // Create the new property with values in the format expected by the API
     const newProperty = {
-      uuid: generateUUIDv7(),
-      key: newPropertyKey,
+      property: [
+        {
+          key: newPropertyKey,
+          label: '',
+          description: '',
+          type: '',
+        },
+      ],
       values: newPropertyValues.map((v) => ({
-        uuid: v.uuid,
-        value: v.value,
-        files: v.files,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        value: [
+          {
+            uuid: v.uuid,
+            value: v.value,
+            valueTypeCast: 'string',
+          },
+        ],
+        files: v.files.map((f) => ({
+          file: {
+            fileName: f.name,
+            fileReference: f.uuid,
+            label: f.name,
+          },
+        })),
       })),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      files: [],
     }
 
     // Add to object properties

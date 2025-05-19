@@ -12,24 +12,15 @@ import {
   MoreHorizontal,
 } from 'lucide-react'
 
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { DeleteConfirmationDialog } from '@/components/modals/delete-confirmation-dialog'
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetClose,
-} from '@/components/ui/sheet'
-import {
+  Button,
+  ScrollArea,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+} from '@/components/ui'
+import { DeleteConfirmationDialog } from '@/components/modals'
 
 // Define interfaces for our data
 interface Property {
@@ -50,6 +41,21 @@ interface ObjectItem {
   createdAt: string
   updatedAt: string
   files?: any[]
+  softDeleted?: boolean
+  softDeletedAt?: string
+  softDeleteBy?: string
+  description?: string
+}
+
+// Define type for history items
+interface HistoryItem {
+  uuid: string
+  name: string
+  createdAt: string
+  description?: string
+  softDeleted?: boolean
+  softDeletedAt?: string
+  [key: string]: any
 }
 
 interface ObjectColumnsViewProps {
@@ -174,190 +180,6 @@ function ObjectColumn({
         </div>
       </ScrollArea>
     </div>
-  )
-}
-
-// Object details sheet
-function ObjectDetailsSheet({
-  item,
-  isOpen,
-  onClose,
-  availableModels,
-  onViewFull,
-  onEdit,
-  onDelete,
-  onPropertyClick,
-}: {
-  item: ObjectItem | null
-  isOpen: boolean
-  onClose: () => void
-  availableModels: any[]
-  onViewFull: (item: ObjectItem) => void
-  onEdit: (item: ObjectItem) => void
-  onDelete: (item: ObjectItem) => void
-  onPropertyClick: (property: any) => void
-}) {
-  if (!item) return null
-
-  // Find model if applicable
-  const model = item.modelUuid
-    ? availableModels.find((m) => m.uuid === item.modelUuid)
-    : null
-
-  // Format property value for display
-  const formatPropertyValue = (property: any) => {
-    // Handle property format with values array
-    if (property.values && property.values.length > 0) {
-      const values = property.values.map((v: any) => v.value).filter(Boolean)
-      return values.join(', ')
-    }
-
-    // Handle old property format
-    if (typeof property.value === 'string') {
-      return property.value
-    }
-
-    return 'N/A'
-  }
-
-  return (
-    <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="sm:max-w-xl">
-        <SheetHeader>
-          <div className="flex justify-between items-center">
-            <SheetTitle>{item.name}</SheetTitle>
-          </div>
-          <SheetDescription>
-            {model && (
-              <Badge variant="outline">
-                {model.name} v{model.version}
-              </Badge>
-            )}
-          </SheetDescription>
-        </SheetHeader>
-
-        <ScrollArea className="mt-6 h-[calc(100vh-200px)]">
-          <div className="space-y-6">
-            {/* Metadata Section */}
-            <div>
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                Metadata
-              </h3>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <div className="text-sm font-medium">UUID</div>
-                  <div className="text-sm font-mono text-muted-foreground">
-                    {item.uuid}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-sm font-medium">Created</div>
-                  <div className="text-sm text-muted-foreground">
-                    {new Date(item.createdAt).toLocaleString()}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-sm font-medium">Updated</div>
-                  <div className="text-sm text-muted-foreground">
-                    {new Date(item.updatedAt).toLocaleString()}
-                  </div>
-                </div>
-                {item.children && (
-                  <div>
-                    <div className="text-sm font-medium">Children</div>
-                    <div className="text-sm text-muted-foreground">
-                      {item.children.length} items
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Properties Section */}
-            <div>
-              <div className="flex justify-between items-center mb-3">
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                  Properties
-                </h3>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onViewFull(item)}
-                >
-                  Manage Properties
-                </Button>
-              </div>
-              {item.properties && item.properties.length > 0 ? (
-                <div className="space-y-2">
-                  {item.properties.map((prop, idx) => (
-                    <div
-                      key={idx}
-                      className="grid grid-cols-3 gap-2 py-1 border-b border-muted last:border-0 hover:bg-muted/20 cursor-pointer"
-                      onClick={() => onPropertyClick(prop)}
-                    >
-                      <div className="font-medium text-sm">{prop.key}</div>
-                      <div className="col-span-2 text-sm">
-                        {formatPropertyValue(prop)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-sm text-muted-foreground bg-muted/20 rounded-md p-3">
-                  No properties defined for this object
-                </div>
-              )}
-            </div>
-
-            {/* Files Section */}
-            <div>
-              <div className="flex justify-between items-center mb-3">
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                  Files
-                </h3>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onViewFull(item)}
-                >
-                  Manage Files
-                </Button>
-              </div>
-              {item.files && item.files.length > 0 ? (
-                <div className="space-y-2">
-                  {item.files.map((file, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between py-1 border-b border-muted last:border-0"
-                    >
-                      <div className="flex items-center">
-                        <FileText className="h-4 w-4 mr-2 text-muted-foreground" />
-                        <span className="text-sm">{file.name}</span>
-                      </div>
-                      <span className="text-xs text-muted-foreground">
-                        {file.size}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-sm text-muted-foreground bg-muted/20 rounded-md p-3">
-                  No files attached to this object
-                </div>
-              )}
-            </div>
-          </div>
-        </ScrollArea>
-
-        <div className="mt-6 flex justify-end">
-          <SheetClose asChild>
-            <Button className="w-full" onClick={onClose}>
-              Close
-            </Button>
-          </SheetClose>
-        </div>
-      </SheetContent>
-    </Sheet>
   )
 }
 

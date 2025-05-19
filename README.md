@@ -158,6 +158,82 @@ The application supports importing and exporting object data in JSON format.
    - Import as children of: Objects will be added as children of the selected parent object
 5. Click "Import Objects" to complete the import
 
+### XLSX/CSV Import
+
+The application supports importing object data from XLSX and CSV files:
+
+1. Navigate to the Import page
+2. Follow the step-by-step wizard:
+   - Upload XLSX/CSV file
+   - Select the sheet containing your data
+   - Map columns to object properties
+   - Preview and import the data
+3. The import process runs asynchronously using Redis as a queue
+4. You'll be automatically redirected to the Import Status page to track progress
+5. Import can be resumed if interrupted
+
+#### Import Status Page
+
+The application features a dedicated Import Status page:
+
+1. View detailed progress of ongoing imports
+2. Check the success/failure status of completed imports
+3. Access via direct URL: `/import-status?jobId=your-job-id`
+4. Shows:
+   - Real-time progress indicators
+   - Number of objects processed
+   - Failure counts and details
+   - Start and completion timestamps
+
+#### Redis for Import Process
+
+The import functionality uses Redis to manage the import queue and provide reliability:
+
+1. Start Redis with the provided Docker Compose file:
+
+   ```bash
+   docker-compose up -d
+   ```
+
+2. Set up environment variables:
+
+   - `REDIS_URL`: URL for Redis connection (default: redis://localhost:6379)
+   - `JAVA_API_URL`: URL for the backend API (default: http://localhost:8080/api/objects)
+   - `API_TOKEN`: Authentication token for the backend API
+   - `API_REQUEST_DELAY`: Delay in milliseconds between individual API requests (default: 100)
+
+3. The import process will:
+   - Store import data in Redis
+   - Process objects one by one (not in batches)
+   - Send individual API requests for each object with configurable delay
+   - Track progress and failures
+   - Allow resuming imports if interrupted
+
+#### Handling Large Datasets
+
+The import system is designed to handle datasets of various sizes:
+
+1. **Regular Imports** (< 10MB):
+
+   - Standard upload process
+   - Data sent in a single API call
+
+2. **Large Imports** (10MB - 50MB):
+
+   - Uses optimized streaming approach
+   - Extended timeout to handle larger payloads
+   - Server-side streaming to avoid memory issues
+
+3. **Extremely Large Imports** (> 50MB):
+   - Automatically switches to progressive chunked upload
+   - Data split into smaller chunks (1,000 objects per chunk)
+   - Each chunk uploaded separately
+   - Real-time progress tracking
+   - Redis-based reassembly on the server
+   - Fault-tolerant processing
+
+This approach ensures reliable handling of datasets ranging from a few objects to hundreds of thousands, without overwhelming the browser, network, or server resources.
+
 ## Development
 
 ### Project Structure

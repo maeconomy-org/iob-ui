@@ -1,9 +1,9 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
+import { Toaster } from 'sonner'
 
 import Footer from '@/components/footer'
-import { Toaster } from '@/components/ui/toaster'
 import ClientLayout from '@/components/client-layout'
 import { SearchProvider } from '@/contexts/search-context'
 import { QueryProvider } from '@/providers/query-provider'

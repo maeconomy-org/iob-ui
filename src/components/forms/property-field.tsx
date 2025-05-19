@@ -149,7 +149,8 @@ export function PropertyField({
                 )}
               />
 
-              <Button
+              {/* TODO: Update when we have proper file upload api */}
+              {/* <Button
                 type="button"
                 variant="outline"
                 size="icon"
@@ -157,7 +158,7 @@ export function PropertyField({
                 title="Add file to value"
               >
                 <Upload className="h-4 w-4" />
-              </Button>
+              </Button> */}
 
               {valueFields.length > 1 && (
                 <Button
@@ -172,7 +173,8 @@ export function PropertyField({
               )}
             </div>
 
-            <Controller
+            {/* TODO: Update when we have proper file upload api */}
+            {/* <Controller
               control={control}
               name={`${valuesName}.${valueIndex}.files`}
               render={({ field }) => (
@@ -207,7 +209,7 @@ export function PropertyField({
                   )}
                 </>
               )}
-            />
+            /> */}
           </div>
         ))}
 
@@ -223,7 +225,8 @@ export function PropertyField({
         </Button>
       </div>
 
-      <div className="space-y-2">
+      {/* TODO: Update when we have proper file upload api */}
+      {/* <div className="space-y-2">
         <div className="flex justify-between items-center">
           <Label className="text-sm">Property Files</Label>
           <Button
@@ -277,7 +280,7 @@ export function PropertyField({
             </>
           )}
         />
-      </div>
+      </div> */}
     </div>
   )
 }

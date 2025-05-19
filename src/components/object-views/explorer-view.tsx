@@ -10,37 +10,37 @@ import {
   Wind,
   Layers,
   FileText,
-  MoreHorizontal,
   Search,
   Edit,
   Trash2,
-  ChevronsDownUp,
-  ChevronsUpDown,
+  Clock,
 } from 'lucide-react'
 
 import {
   Button,
   Input,
   Badge,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
   ScrollArea,
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
 } from '@/components/ui'
 import {
   PropertyDetailsModal,
-  PropertyManagementModal,
-  FileManagementModal,
   DeleteConfirmationDialog,
 } from '@/components/modals'
+import { useObjects, usePropertyEditor, usePropertyManagement } from '@/hooks'
+import { useIobClient } from '@/providers/query-provider'
 
 // Define interfaces for our data
 interface Property {
   uuid: string
   key: string
   value?: string
-  values?: { value: string }[]
+  values?: { uuid?: string; value: string }[]
+  label?: string
+  description?: string
+  type?: string
 }
 
 interface ObjectItem {
@@ -57,6 +57,10 @@ interface ObjectItem {
   createdAt: string
   updatedAt: string
   files?: any[]
+  softDeleted?: boolean
+  softDeletedAt?: string
+  softDeleteBy?: string
+  lastUpdatedAt?: string
 }
 
 interface TreeItemProps {
@@ -79,6 +83,7 @@ interface DetailsPanelProps {
   onEdit: (item: ObjectItem) => void
   onDelete: (item: ObjectItem) => void
   onPropertyClick: (property: any) => void
+  onSaveObject?: (object: any) => void
 }
 
 interface ObjectExplorerViewProps {
@@ -143,9 +148,9 @@ function TreeItem({
   return (
     <>
       <div
-        className={`flex items-center px-2 py-1.5 hover:bg-muted/50 cursor-pointer rounded-sm ${
+        className={`flex items-center px-2 py-2.5 hover:bg-muted/50 cursor-pointer rounded-sm ${
           isSelected ? 'bg-muted' : ''
-        } ${isDeleted ? 'bg-destructive/10' : ''}`}
+        }`}
         onClick={handleSelect}
       >
         <div
@@ -187,32 +192,6 @@ function TreeItem({
             </Badge>
           )}
         </div>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => onViewDetails(item)}>
-              View Details
-            </DropdownMenuItem>
-            {!isDeleted && (
-              <>
-                <DropdownMenuItem onClick={() => onEdit(item)}>
-                  Edit
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => onDelete(item)}
-                  className="text-destructive"
-                >
-                  Delete
-                </DropdownMenuItem>
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
 
       {isExpanded && hasChildren && (
@@ -238,18 +217,95 @@ function TreeItem({
   )
 }
 
+// Check if an object is soft deleted based on system properties
+const isObjectDeleted = (object: any) => {
+  // Direct check for softDeleted flag on the object
+  return object?.softDeleted === true
+}
+
+// Function to get deleted metadata for an object
+const getDeletedMetadata = (object: any) => {
+  if (!object) return null
+
+  // Get deletion metadata directly from object properties
+  return {
+    deletedAt: object.softDeletedAt || null,
+    deletedBy: object.softDeleteBy || null,
+  }
+}
+
 // Object details panel
 function DetailsPanel({
   item,
   availableModels,
+  onViewDetails,
   onEdit,
   onDelete,
   onPropertyClick,
+  onSaveObject,
 }: DetailsPanelProps) {
-  const [isPropertyModalOpen, setIsPropertyModalOpen] = useState(false)
-  const [isFileModalOpen, setIsFileModalOpen] = useState(false)
   const [isPropertyDetailsOpen, setIsPropertyDetailsOpen] = useState(false)
   const [selectedProperty, setSelectedProperty] = useState<any>(null)
+  const [isHistoryExpanded, setIsHistoryExpanded] = useState(false)
+
+  // Use the iob-client hooks
+  const { useFullObject } = useObjects()
+  const client = useIobClient()
+  const { property: editedProperty } = usePropertyEditor(selectedProperty)
+
+  // Use our new property management hook
+  const { updatePropertyWithValues, isLoading: isPropertyUpdateLoading } =
+    usePropertyManagement(item?.uuid)
+
+  // State for processed object data
+  const [files, setFiles] = useState<any[]>([])
+  const [properties, setProperties] = useState<any[]>([])
+  const [objectHistory, setObjectHistory] = useState<ObjectItem[]>([])
+
+  // Fetch full object data when an item is selected
+  const { data: fullObjectData, isLoading } = useFullObject(item?.uuid || '', {
+    enabled: !!item?.uuid,
+  })
+
+  // Process the fetched object data
+  useEffect(() => {
+    if (!fullObjectData) return
+
+    // Extract all object versions and sort by date (newest first)
+    const objects = Array.isArray(fullObjectData.object)
+      ? fullObjectData.object
+      : [fullObjectData.object]
+    const sortedObjects = objects.sort(
+      (a: any, b: any) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    )
+
+    // Set history to all but the first object
+    setObjectHistory(sortedObjects.slice(1))
+
+    // Process properties
+    const processedProperties =
+      fullObjectData.properties?.map((propGroup: any) => {
+        // Extract property metadata from the first property item
+        const propMeta = propGroup.property?.[0] || {}
+
+        // Extract and combine all values
+        const values =
+          propGroup.values?.flatMap(
+            (valueObj: any) => valueObj.value?.map((val: any) => val) || []
+          ) || []
+
+        return {
+          ...propMeta,
+          values,
+        }
+      }) || []
+
+    setProperties(processedProperties)
+
+    // Process files
+    setFiles(fullObjectData.files || [])
+  }, [fullObjectData])
 
   if (!item) {
     return (
@@ -269,18 +325,20 @@ function DetailsPanel({
     : null
 
   const formatPropertyValue = (property: any) => {
-    // Handle property format with values array
+    // Handle property with values array in new structure
     if (property.values && property.values.length > 0) {
-      const values = property.values.map((v: any) => v.value).filter(Boolean)
-      return values.join(', ')
+      return property.values
+        .filter((v: any) => v && v.value && !v.softDeleted)
+        .map((v: any) => v.value)
+        .join(', ')
     }
 
-    // Handle old property format
+    // Handle property with single value
     if (typeof property.value === 'string') {
       return property.value
     }
 
-    return 'N/A'
+    return ''
   }
 
   const handlePropertyClick = (property: any) => {
@@ -291,13 +349,52 @@ function DetailsPanel({
     }
   }
 
-  const handleSaveProperty = () => {
+  const handleSaveProperty = async () => {
+    if (!selectedProperty || !item) return
+
+    try {
+      // Save the property using our new comprehensive hook
+      if (editedProperty) {
+        // Use a type assertion to handle additional properties
+        const propertyData = {
+          uuid: selectedProperty.uuid,
+          key: editedProperty.key,
+        } as any
+
+        // Add optional fields if they exist in the edited property
+        if ((editedProperty as any).label) {
+          propertyData.label = (editedProperty as any).label
+        }
+        if ((editedProperty as any).description) {
+          propertyData.description = (editedProperty as any).description
+        }
+        if ((editedProperty as any).type) {
+          propertyData.type = (editedProperty as any).type
+        }
+
+        await updatePropertyWithValues(
+          propertyData,
+          editedProperty.values || []
+        )
+
+        // Refresh the object data after updates
+        if (onSaveObject && item) {
+          // Since we updated properties directly via API, we should refetch the object
+          const response = await client.objects.getFullObject(item.uuid)
+          if (response.data) {
+            onSaveObject(response.data)
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error saving property:', error)
+    }
+
     setIsPropertyDetailsOpen(false)
   }
 
-  const handleSaveObject = () => {
-    // In view-only mode, we don't need to do anything
-  }
+  const isDeleted = isObjectDeleted(item)
+  const deletedMetadata = isDeleted ? getDeletedMetadata(item) : null
 
   return (
     <>
@@ -306,7 +403,12 @@ function DetailsPanel({
           {/* Header with actions */}
           <div className="flex justify-between items-start">
             <div>
-              <h2 className="text-xl font-semibold">{item.name}</h2>
+              <span className="flex items-center gap-2">
+                <h2 className="text-xl font-semibold">{item.name}</h2>
+                {isDeleted && (
+                  <Badge className="mt-1 ml-2 bg-destructive">Deleted</Badge>
+                )}
+              </span>
               {model && (
                 <Badge className="mt-1">
                   {model.name} v{model.version}
@@ -318,15 +420,19 @@ function DetailsPanel({
                 <Edit className="h-4 w-4 mr-2" />
                 Edit
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onDelete(item)}
-                className="text-destructive"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete
-              </Button>
+              {!isDeleted && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onDelete(item)}
+                    className="text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </Button>
+                </>
+              )}
             </div>
           </div>
 
@@ -384,11 +490,44 @@ function DetailsPanel({
                   <div>
                     <div className="text-sm font-medium">Updated</div>
                     <div className="text-sm text-muted-foreground">
-                      {item?.updatedAt &&
-                        new Date(item.updatedAt).toLocaleString()}
+                      {item?.lastUpdatedAt &&
+                        new Date(item.lastUpdatedAt).toLocaleString()}
                     </div>
                   </div>
                 </div>
+
+                {/* Deletion Metadata */}
+                {isDeleted && deletedMetadata && (
+                  <div className="mt-4 bg-destructive/10 p-3 rounded-md">
+                    <h4 className="text-sm font-medium text-destructive mb-2">
+                      Deletion Information
+                    </h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      {deletedMetadata.deletedAt && (
+                        <div>
+                          <div className="text-sm font-medium">Deleted At</div>
+                          <div className="text-sm text-muted-foreground">
+                            {new Date(
+                              deletedMetadata.deletedAt
+                            ).toLocaleString()}
+                          </div>
+                        </div>
+                      )}
+                      {deletedMetadata.deletedBy && (
+                        <div>
+                          <div className="text-sm font-medium">Deleted By</div>
+                          <div
+                            className="text-sm text-muted-foreground"
+                            aria-label={deletedMetadata.deletedBy}
+                            title={deletedMetadata.deletedBy}
+                          >
+                            {deletedMetadata.deletedBy.substring(0, 30) + '...'}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -399,20 +538,22 @@ function DetailsPanel({
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                 Properties
               </h3>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsPropertyModalOpen(true)}
-              >
-                Manage Properties
-              </Button>
             </div>
 
-            {item.properties && item.properties.length > 0 ? (
+            {isLoading ? (
+              <div className="py-4 text-center">
+                <div className="inline-flex items-center gap-2">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+                  <span className="text-sm text-muted-foreground">
+                    Loading properties...
+                  </span>
+                </div>
+              </div>
+            ) : properties && properties.length > 0 ? (
               <div className="space-y-2">
-                {item.properties.map((prop, idx) => (
+                {properties.map((prop, idx) => (
                   <div
-                    key={idx}
+                    key={prop.uuid || idx}
                     className="grid grid-cols-3 gap-2 py-1 border-b border-muted last:border-0 hover:bg-muted/20 cursor-pointer"
                     onClick={() => handlePropertyClick(prop)}
                   >
@@ -436,29 +577,28 @@ function DetailsPanel({
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                 Files
               </h3>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsFileModalOpen(true)}
-              >
-                Manage Files
-              </Button>
             </div>
 
-            {item.files && item.files.length > 0 ? (
+            {isLoading ? (
+              <div className="py-4 text-center">
+                <div className="inline-flex items-center gap-2">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+                  <span className="text-sm text-muted-foreground">
+                    Loading files...
+                  </span>
+                </div>
+              </div>
+            ) : files && files.length > 0 ? (
               <div className="space-y-2">
-                {item.files.map((file: any, idx: number) => (
+                {files.map((file: any, idx: number) => (
                   <div
                     key={idx}
                     className="flex items-center justify-between py-1 border-b border-muted last:border-0"
                   >
                     <div className="flex items-center">
                       <FileText className="h-4 w-4 mr-2 text-muted-foreground" />
-                      <span className="text-sm">{file.name}</span>
+                      <span className="text-sm">{file.label || file.name}</span>
                     </div>
-                    <span className="text-xs text-muted-foreground">
-                      {file.size}
-                    </span>
                   </div>
                 ))}
               </div>
@@ -507,17 +647,74 @@ function DetailsPanel({
               </div>
             </div>
           )}
+
+          {/* Object History Section */}
+          {objectHistory && objectHistory.length > 0 && (
+            <div>
+              <Collapsible
+                open={isHistoryExpanded}
+                onOpenChange={setIsHistoryExpanded}
+                className="w-full"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <CollapsibleTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="flex items-center p-0 hover:bg-transparent"
+                    >
+                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                        Object History ({objectHistory.length})
+                      </h3>
+                      {isHistoryExpanded ? (
+                        <ChevronDown className="h-4 w-4 ml-2" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 ml-2" />
+                      )}
+                    </Button>
+                  </CollapsibleTrigger>
+                </div>
+
+                <CollapsibleContent className="space-y-3">
+                  {objectHistory.map((historyItem, index) => (
+                    <div key={index} className="bg-muted/20 rounded-md p-3">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm font-medium">
+                          {historyItem.name}
+                          {historyItem.softDeleted && (
+                            <Badge
+                              variant="outline"
+                              className="ml-2 text-destructive"
+                            >
+                              Deleted
+                            </Badge>
+                          )}
+                        </span>
+                        <span className="text-xs text-muted-foreground flex items-center">
+                          <Clock className="h-3 w-3 mr-1" />
+                          {new Date(historyItem.createdAt).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {historyItem.description || 'No description'}
+                      </div>
+                      {historyItem.softDeleted && (
+                        <div className="text-xs text-destructive mt-1">
+                          Deleted:{' '}
+                          {historyItem.softDeletedAt &&
+                            new Date(
+                              historyItem.softDeletedAt
+                            ).toLocaleString()}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </CollapsibleContent>
+              </Collapsible>
+            </div>
+          )}
         </div>
       </ScrollArea>
-
-      {/* Property Management Modal */}
-      <PropertyManagementModal
-        object={item}
-        isOpen={isPropertyModalOpen}
-        onClose={() => setIsPropertyModalOpen(false)}
-        onSave={handleSaveObject}
-        onViewPropertyDetails={handlePropertyClick}
-      />
 
       {/* Property Details Modal */}
       {selectedProperty && (
@@ -528,39 +725,8 @@ function DetailsPanel({
           onSave={handleSaveProperty}
         />
       )}
-
-      {/* File Management Modal */}
-      <FileManagementModal
-        object={item}
-        isOpen={isFileModalOpen}
-        onClose={() => setIsFileModalOpen(false)}
-        onSave={handleSaveObject}
-      />
     </>
   )
-}
-
-// Check if an object is soft deleted based on system properties
-const isObjectDeleted = (object: any) => {
-  // Check if object has a system:softDeleted property with value true
-  if (!object || !object.properties) return false
-
-  const softDeletedProp = object.properties.find(
-    (p: any) =>
-      p.property?.key === 'system:softDeleted' || p.key === 'system:softDeleted'
-  )
-
-  if (!softDeletedProp) return false
-
-  // Check the value - could be in different formats depending on API
-  // Look for the value in the values array first
-  if (softDeletedProp.values && softDeletedProp.values.length > 0) {
-    const valueObj = softDeletedProp.values[0]
-    return valueObj.value === true || valueObj.value === 'true'
-  }
-
-  // Or check direct value property
-  return softDeletedProp.value === true || softDeletedProp.value === 'true'
 }
 
 export function ObjectExplorerView({
@@ -573,7 +739,6 @@ export function ObjectExplorerView({
   const [expandedItems, setExpandedItems] = useState<string[]>([])
   const [selectedItem, setSelectedItem] = useState<ObjectItem | null>(null)
   const [search, setSearch] = useState('')
-  const [allExpanded, setAllExpanded] = useState(false)
 
   // Modal states
   const [isFullDetailsModalOpen, setIsFullDetailsModalOpen] = useState(false)
@@ -581,13 +746,16 @@ export function ObjectExplorerView({
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [objectToDelete, setObjectToDelete] = useState<ObjectItem | null>(null)
 
-  // Initialize with root objects expanded
-  useEffect(() => {
-    // Root IDs for initial expansion
-    const rootIds = data.map((obj) => obj.uuid)
-    setExpandedItems(rootIds)
-    setAllExpanded(true)
-  }, [data])
+  // Use the iob-client hooks
+  const { useDeleteObject, useAllObjects } = useObjects()
+
+  // Get the delete mutation
+  const { mutateAsync: deleteObject } = useDeleteObject()
+
+  // Fetch the list of available objects for parent selection in edit mode
+  const { data: availableObjects = [] } = useAllObjects({
+    enabled: isEditModalOpen,
+  })
 
   // Filter objects based on search
   const filteredObjects = useMemo(() => {
@@ -621,26 +789,6 @@ export function ObjectExplorerView({
     return filterByName(data, search)
   }, [search, data])
 
-  // Handle expand/collapse all
-  const toggleExpandAll = () => {
-    if (allExpanded) {
-      // Collapse all
-      setExpandedItems([])
-    } else {
-      // Expand all - collect all object IDs with children recursively
-      const getAllIds = (items: ObjectItem[]): string[] => {
-        return items.reduce((acc: string[], item) => {
-          if (item.children && item.children.length > 0) {
-            return [...acc, item.uuid, ...getAllIds(item.children)]
-          }
-          return acc
-        }, [])
-      }
-      setExpandedItems(getAllIds(data))
-    }
-    setAllExpanded(!allExpanded)
-  }
-
   // Handler functions
   const handleViewDetails = (item: ObjectItem) => {
     if (onViewObject) {
@@ -655,6 +803,7 @@ export function ObjectExplorerView({
     if (onEditObject) {
       onEditObject(item)
     } else {
+      // Local fallback if parent doesn't provide edit handler
       setSelectedItem(item)
       setIsEditModalOpen(true)
     }
@@ -665,22 +814,21 @@ export function ObjectExplorerView({
     setIsDeleteModalOpen(true)
   }
 
-  const handleDeleteConfirm = (uuid: string) => {
-    console.log('Deleting object:', uuid)
-    // TODO: Implement delete logic here using the iob-client
+  const handleDeleteConfirm = async (uuid: string) => {
+    try {
+      await deleteObject(uuid)
+      // Remove the deleted object from the local state or refresh data
+      console.log('Object deleted successfully:', uuid)
+      setIsDeleteModalOpen(false)
+    } catch (error) {
+      console.error('Error deleting object:', error)
+    }
   }
 
   const handlePropertyClick = (property: any) => {
     // This method is now implemented in the DetailsPanel component
     // It's kept here as a simple pass-through to maintain API compatibility
     console.log('Property clicked:', property)
-  }
-
-  const handleSaveObject = (updatedObject: ObjectItem) => {
-    if (onSaveObject) {
-      onSaveObject(updatedObject)
-    }
-    setIsEditModalOpen(false)
   }
 
   return (
@@ -698,18 +846,6 @@ export function ObjectExplorerView({
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={toggleExpandAll}
-              title={allExpanded ? 'Collapse all' : 'Expand all'}
-            >
-              {allExpanded ? (
-                <ChevronsDownUp className="h-4 w-4" />
-              ) : (
-                <ChevronsUpDown className="h-4 w-4" />
-              )}
-            </Button>
           </div>
 
           <div className="flex-1 overflow-auto p-1">
@@ -749,10 +885,12 @@ export function ObjectExplorerView({
             onEdit={handleEdit}
             onDelete={handleDelete}
             onPropertyClick={handlePropertyClick}
+            onSaveObject={onSaveObject}
           />
         </div>
       </div>
 
+      {/* Delete Confirmation Dialog */}
       {isDeleteModalOpen && objectToDelete && (
         <DeleteConfirmationDialog
           open={isDeleteModalOpen}

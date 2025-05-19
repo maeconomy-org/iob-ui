@@ -1,13 +1,17 @@
 'use client'
 
-import { useState } from 'react'
-import { FileText, Edit, Trash2, Loader2 } from 'lucide-react'
-
+import { useState, useMemo } from 'react'
 import {
-  FileManagementModal,
-  PropertyDetailsModal,
-  PropertyManagementModal,
-} from '@/components/modals'
+  FileText,
+  Edit,
+  Trash2,
+  Loader2,
+  ChevronDown,
+  ChevronRight,
+  Clock,
+} from 'lucide-react'
+
+import { PropertyDetailsModal } from '@/components/modals'
 import {
   Badge,
   Button,
@@ -18,8 +22,11 @@ import {
   SheetHeader,
   SheetTitle,
   SheetFooter,
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
 } from '@/components/ui'
-import { useObjects } from '@/hooks'
+import { useObjects, usePropertyManagement } from '@/hooks'
 
 interface ObjectSheetProps {
   isOpen: boolean
@@ -30,6 +37,7 @@ interface ObjectSheetProps {
   onDelete?: (objectId: string) => void
   onEdit?: () => void
   isDeleted?: boolean
+  onSave?: (object: any, originalObject?: any) => void
 }
 
 export function ObjectDetailsSheet({
@@ -41,21 +49,73 @@ export function ObjectDetailsSheet({
   onDelete,
   onEdit,
   isDeleted,
+  onSave,
 }: ObjectSheetProps) {
   // Get the useFullObject hook to fetch the complete object data
   const { useFullObject } = useObjects()
 
   // Fetch the full object details if a UUID is provided
-  const { data: fullObject, isLoading } = useFullObject(uuid || '', {
+  const { data: fullObjectData, isLoading } = useFullObject(uuid || '', {
     enabled: !!uuid && isOpen,
   })
 
-  // Use the API data if available, otherwise fall back to the passed object
-  const object = fullObject || initialObject
+  // Process object data to get the latest version and proper property structure
+  const { object, properties, files, objectHistory } = useMemo(() => {
+    if (!fullObjectData) {
+      return {
+        object: initialObject,
+        properties: [],
+        files: [],
+        objectHistory: [],
+      }
+    }
+
+    // Extract all object versions and sort by date (newest first)
+    const objects = Array.isArray(fullObjectData.object)
+      ? fullObjectData.object
+      : [fullObjectData.object]
+    const sortedObjects = objects.sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    )
+
+    // Always get the latest object (regardless of deletion status)
+    const latestObject = sortedObjects[0]
+
+    // All other objects (for history)
+    const history = sortedObjects.slice(1)
+
+    // Process properties to correct format
+    const processedProperties =
+      fullObjectData.properties?.map((propGroup: any) => {
+        // Extract property metadata from the first property item
+        const propMeta = propGroup.property?.[0] || {}
+
+        // Extract and combine all values
+        const values =
+          propGroup.values?.flatMap(
+            (valueObj: any) => valueObj.value?.map((val: any) => val) || []
+          ) || []
+
+        return {
+          ...propMeta,
+          values,
+        }
+      }) || []
+
+    // Process files
+    const processedFiles = fullObjectData.files || []
+
+    return {
+      object: latestObject,
+      properties: processedProperties,
+      files: processedFiles,
+      objectHistory: history,
+    }
+  }, [fullObjectData, initialObject])
 
   // State for property and file management
-  const [isPropertyModalOpen, setIsPropertyModalOpen] = useState(false)
-  const [isFileModalOpen, setIsFileModalOpen] = useState(false)
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const [selectedProperty, setSelectedProperty] = useState<any>(null)
   const [isPropertyDetailsOpen, setIsPropertyDetailsOpen] = useState(false)
 
@@ -70,10 +130,12 @@ export function ObjectDetailsSheet({
     : null
 
   const formatPropertyValue = (property: any) => {
-    // Handle property with values array
+    // Handle property with values array in new structure
     if (property.values && property.values.length > 0) {
-      const values = property.values.map((v: any) => v.value).filter(Boolean)
-      return values.join(', ')
+      return property.values
+        .filter((v: any) => v && v.value && !v.softDeleted)
+        .map((v: any) => v.value)
+        .join(', ')
     }
 
     // Handle property with single value
@@ -84,34 +146,72 @@ export function ObjectDetailsSheet({
     return ''
   }
 
-  const handleManageProperties = () => {
-    setIsPropertyModalOpen(true)
-  }
-
-  const handleManageFiles = () => {
-    setIsFileModalOpen(true)
-  }
-
   const handlePropertyClick = (property: any) => {
     setSelectedProperty(property)
     setIsPropertyDetailsOpen(true)
   }
 
-  const handleSaveProperty = () => {
-    // In view-only mode, we don't update the object
+  // Use our new property management hook instead
+  const { updatePropertyWithValues, isLoading: isPropertyUpdateLoading } =
+    usePropertyManagement(object?.uuid)
+
+  const handleSaveProperty = async (updatedProperty: any) => {
+    console.log('updatedProperty', updatedProperty)
+
+    try {
+      // Use our more comprehensive hook to update the property
+      await updatePropertyWithValues(
+        {
+          uuid: updatedProperty.uuid,
+          key: updatedProperty.key,
+          // Include optional metadata if available
+          ...(updatedProperty.label && { label: updatedProperty.label }),
+          ...(updatedProperty.description && {
+            description: updatedProperty.description,
+          }),
+          ...(updatedProperty.type && { type: updatedProperty.type }),
+        },
+        // Include all values from the property
+        updatedProperty.values || []
+      )
+
+      // Find the property in the object's properties array
+      const updatedProperties = properties.map((prop: any) =>
+        prop.uuid === updatedProperty.uuid ? updatedProperty : prop
+      )
+
+      console.log('updatedProperties', updatedProperties)
+
+      // Create updated object with the modified properties
+      const updatedObject = {
+        ...object,
+        properties: updatedProperties,
+      }
+
+      console.log('updatedObject', updatedObject)
+
+      // Call the parent's save function if provided
+      if (onSave) {
+        onSave(updatedObject)
+      }
+    } catch (error) {
+      console.error('Error updating property:', error)
+    }
+
     setIsPropertyDetailsOpen(false)
   }
 
-  const handleSaveObject = () => {
-    // In view-only mode, we don't update the object
-  }
+  const isObjectDeleted = object?.softDeleted || isDeleted
 
   return (
     <>
       <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
         <SheetContent className="sm:max-w-xl overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>{initialObject?.name}</SheetTitle>
+            <span className="flex items-center gap-2">
+              <SheetTitle>{object?.name}</SheetTitle>
+              {isObjectDeleted && <Badge variant="destructive">Deleted</Badge>}
+            </span>
             {model && (
               <SheetDescription>
                 <Badge variant="outline">
@@ -133,82 +233,86 @@ export function ObjectDetailsSheet({
                   <div>
                     <div className="text-sm font-medium">UUID</div>
                     <div className="text-sm font-mono text-muted-foreground">
-                      {initialObject?.uuid}
+                      {object?.uuid}
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <div className="text-sm font-medium">Name</div>
                       <div className="text-sm text-muted-foreground">
-                        {initialObject?.name}
+                        {object?.name}
                       </div>
                     </div>
-                    {initialObject?.abbreviation && (
+                    {object?.abbreviation && (
                       <div>
                         <div className="text-sm font-medium">Abbreviation</div>
                         <div className="text-sm text-muted-foreground">
-                          {initialObject?.abbreviation}
+                          {object?.abbreviation}
                         </div>
                       </div>
                     )}
-                    {initialObject?.version && (
+                    {object?.version && (
                       <div>
                         <div className="text-sm font-medium">Version</div>
                         <div className="text-sm text-muted-foreground">
-                          {initialObject?.version}
+                          {object?.version}
                         </div>
                       </div>
                     )}
-                    {initialObject?.description && (
+                    {object?.description && (
                       <div>
                         <div className="text-sm font-medium">Description</div>
                         <div className="text-sm text-muted-foreground">
-                          {initialObject?.description}
+                          {object?.description}
                         </div>
                       </div>
                     )}
                     <div>
                       <div className="text-sm font-medium">Created</div>
                       <div className="text-sm text-muted-foreground">
-                        {initialObject?.createdAt &&
-                          new Date(initialObject.createdAt).toLocaleString()}
+                        {object?.createdAt &&
+                          new Date(object.createdAt).toLocaleString()}
                       </div>
                     </div>
-                    {initialObject?.updatedAt && (
+                    {object?.lastUpdatedAt && (
                       <div>
                         <div className="text-sm font-medium">Updated</div>
                         <div className="text-sm text-muted-foreground">
-                          {new Date(
-                            initialObject.lastUpdatedAt
-                          ).toLocaleString()}
+                          {new Date(object.lastUpdatedAt).toLocaleString()}
                         </div>
                       </div>
                     )}
-                  </div>
-                  {/* Display soft delete metadata if object is deleted */}
-                  {isDeleted && (
-                    <>
-                      <div>
-                        <div className="text-sm font-medium text-destructive">
-                          Deleted At
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          {initialObject?.deletedAt &&
-                            new Date(initialObject.deletedAt).toLocaleString()}
-                        </div>
-                      </div>
-                      {initialObject?.deletedBy && (
+                    {/* Display soft delete metadata if object is deleted */}
+                    {isObjectDeleted && (
+                      <>
                         <div>
                           <div className="text-sm font-medium text-destructive">
-                            Deleted By
+                            Deleted At
                           </div>
                           <div className="text-sm text-muted-foreground">
-                            {initialObject.deletedBy}
+                            {object?.softDeletedAt &&
+                              new Date(object.softDeletedAt).toLocaleString()}
                           </div>
                         </div>
-                      )}
-                    </>
-                  )}
+                        {object?.softDeleteBy && (
+                          <div>
+                            <div className="text-sm font-medium text-destructive">
+                              Deleted By
+                            </div>
+                            <div
+                              className="text-sm text-muted-foreground font-mono"
+                              title={object.softDeleteBy}
+                              aria-label={object.softDeleteBy}
+                            >
+                              {object.softDeleteBy.substring(
+                                object.softDeleteBy.length - 30
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -219,18 +323,11 @@ export function ObjectDetailsSheet({
                   <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                     Properties
                   </h3>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleManageProperties}
-                  >
-                    Manage Properties
-                  </Button>
                 </div>
 
-                {object?.properties && object.properties.length > 0 ? (
+                {properties && properties.length > 0 ? (
                   <div className="space-y-2">
-                    {object.properties.map((prop: any, idx: number) => (
+                    {properties.map((prop: any, idx: number) => (
                       <div
                         key={prop.uuid || idx}
                         className="grid grid-cols-3 gap-2 py-1 border-b border-muted last:border-0 hover:bg-muted/20 cursor-pointer"
@@ -257,25 +354,20 @@ export function ObjectDetailsSheet({
                   <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                     Files
                   </h3>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleManageFiles}
-                  >
-                    Manage Files
-                  </Button>
                 </div>
 
-                {object?.files && object.files.length > 0 ? (
+                {files && files.length > 0 ? (
                   <div className="space-y-2">
-                    {object.files.map((file: any, idx: number) => (
+                    {files.map((file: any, idx: number) => (
                       <div
                         key={idx}
                         className="flex items-center justify-between py-1 border-b border-muted last:border-0"
                       >
                         <div className="flex items-center">
                           <FileText className="h-4 w-4 mr-2 text-muted-foreground" />
-                          <span className="text-sm">{file.label}</span>
+                          <span className="text-sm">
+                            {file.label || file.name}
+                          </span>
                         </div>
                       </div>
                     ))}
@@ -330,6 +422,73 @@ export function ObjectDetailsSheet({
                   </div>
                 </>
               )}
+
+              {/* Object History Section */}
+              {objectHistory && objectHistory.length > 0 && (
+                <>
+                  <Separator />
+                  <Collapsible
+                    open={isHistoryOpen}
+                    onOpenChange={setIsHistoryOpen}
+                    className="w-full"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <CollapsibleTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="flex items-center p-0 hover:bg-transparent"
+                        >
+                          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                            Object History ({objectHistory.length})
+                          </h3>
+                          {isHistoryOpen ? (
+                            <ChevronDown className="h-4 w-4 ml-2" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 ml-2" />
+                          )}
+                        </Button>
+                      </CollapsibleTrigger>
+                    </div>
+
+                    <CollapsibleContent className="space-y-3">
+                      {objectHistory.map((historyItem, index) => (
+                        <div key={index} className="bg-muted/20 rounded-md p-3">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-sm font-medium">
+                              {historyItem.name}
+                              {historyItem.softDeleted && (
+                                <Badge
+                                  variant="outline"
+                                  className="ml-2 text-destructive"
+                                >
+                                  Deleted
+                                </Badge>
+                              )}
+                            </span>
+                            <span className="text-xs text-muted-foreground flex items-center">
+                              <Clock className="h-3 w-3 mr-1" />
+                              {new Date(historyItem.createdAt).toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {historyItem.description || 'No description'}
+                          </div>
+                          {historyItem.softDeleted && (
+                            <div className="text-xs text-destructive mt-1">
+                              Deleted:{' '}
+                              {historyItem.softDeletedAt &&
+                                new Date(
+                                  historyItem.softDeletedAt
+                                ).toLocaleString()}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </CollapsibleContent>
+                  </Collapsible>
+                </>
+              )}
             </div>
           )}
 
@@ -339,7 +498,7 @@ export function ObjectDetailsSheet({
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => onDelete(initialObject.uuid)}
+                  onClick={() => onDelete(object?.uuid)}
                   className="text-destructive"
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
@@ -362,15 +521,6 @@ export function ObjectDetailsSheet({
         </SheetContent>
       </Sheet>
 
-      {/* Property Management Modal */}
-      <PropertyManagementModal
-        object={object}
-        isOpen={isPropertyModalOpen}
-        onClose={() => setIsPropertyModalOpen(false)}
-        onSave={handleSaveObject}
-        onViewPropertyDetails={handlePropertyClick}
-      />
-
       {/* Property Details Modal */}
       {selectedProperty && (
         <PropertyDetailsModal
@@ -380,14 +530,6 @@ export function ObjectDetailsSheet({
           onSave={handleSaveProperty}
         />
       )}
-
-      {/* File Management Modal */}
-      <FileManagementModal
-        object={object}
-        isOpen={isFileModalOpen}
-        onClose={() => setIsFileModalOpen(false)}
-        onSave={handleSaveObject}
-      />
     </>
   )
 }
