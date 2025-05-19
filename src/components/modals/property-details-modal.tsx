@@ -47,10 +47,6 @@ export function PropertyDetailsModal({
     addValue,
     removeValue,
     updateValue,
-    addFileToProperty,
-    addFileToValue,
-    removeFileFromProperty,
-    removeFileFromValue,
     formatDate,
   } = usePropertyEditor(property)
 
@@ -88,12 +84,13 @@ export function PropertyDetailsModal({
             >
               Values
             </TabsTrigger>
-            <TabsTrigger
+            {/* TODO: Update when we have proper file upload api */}
+            {/* <TabsTrigger
               value="files"
               className="text-base px-4 py-2 data-[state=active]:bg-white"
             >
               Files
-            </TabsTrigger>
+            </TabsTrigger> */}
           </TabsList>
 
           <div className="flex-1 overflow-y-auto px-6 py-4">
@@ -108,7 +105,8 @@ export function PropertyDetailsModal({
                       <div className="flex justify-between items-center">
                         <Label className="text-sm">Value {index + 1}</Label>
                         <div className="flex gap-2">
-                          <Button
+                          {/* TODO: Update when we have proper file upload api */}
+                          {/* <Button
                             type="button"
                             variant="outline"
                             size="icon"
@@ -117,7 +115,7 @@ export function PropertyDetailsModal({
                             className="h-8 w-8"
                           >
                             <Upload className="h-4 w-4" />
-                          </Button>
+                          </Button> */}
                           {editedProperty.values.length > 1 && (
                             <Button
                               type="button"
@@ -136,7 +134,8 @@ export function PropertyDetailsModal({
                         onChange={(e) => updateValue(index, e.target.value)}
                         className="mt-1"
                       />
-                      {value.files && value.files.length > 0 && (
+                      {/* TODO: Update when we have proper file upload api */}
+                      {/* {value.files && value.files.length > 0 && (
                         <div className="space-y-1 mt-2">
                           <Label className="text-xs text-muted-foreground">
                             Files
@@ -171,7 +170,7 @@ export function PropertyDetailsModal({
                             ))}
                           </div>
                         </div>
-                      )}
+                      )} */}
                     </div>
                   ))
                 ) : (
@@ -208,7 +207,8 @@ export function PropertyDetailsModal({
               </div>
             </TabsContent>
 
-            <TabsContent value="files" className="mt-0 space-y-4 mb-4">
+            {/* TODO: Update when we have proper file upload api */}
+            {/* <TabsContent value="files" className="mt-0 space-y-4 mb-4">
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-medium">Property Files</h3>
                 <Button
@@ -274,13 +274,13 @@ export function PropertyDetailsModal({
                   </Button>
                 </div>
               )}
-            </TabsContent>
+            </TabsContent> */}
 
             <TabsContent value="metadata" className="mt-0 space-y-4 mb-4">
               <Card>
                 <CardHeader className="py-3 px-4">
                   <CardTitle className="text-sm font-medium">
-                    Identification
+                    Metadata
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="py-3 px-4 space-y-3">
@@ -296,46 +296,60 @@ export function PropertyDetailsModal({
                     </p>
                     <p className="text-sm">{property.key}</p>
                   </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="py-3 px-4">
-                  <CardTitle className="text-sm font-medium">
-                    Metadata
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="py-3 px-4">
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    {property.creator && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground">
-                          Creator
-                        </p>
-                        <p className="text-sm">{property.creator}</p>
-                      </div>
-                    )}
+                  <div className="grid grid-cols-2 gap-4">
                     {property.createdAt && (
                       <div>
                         <p className="text-xs font-medium text-muted-foreground">
-                          Created
+                          Created At
                         </p>
                         <p className="text-sm">
                           {formatDate(property.createdAt)}
                         </p>
                       </div>
                     )}
-                    {property.updatedAt && (
+                    {property.lastUpdatedAt && (
                       <div>
                         <p className="text-xs font-medium text-muted-foreground">
-                          Updated
+                          Updated At
                         </p>
                         <p className="text-sm">
-                          {formatDate(property.updatedAt)}
+                          {formatDate(property.lastUpdatedAt)}
                         </p>
                       </div>
                     )}
                   </div>
+                  {property.lastUpdatedBy && (
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground">
+                        Updated By
+                      </p>
+                      <p className="text-sm font-mono">
+                        {property.lastUpdatedBy}
+                      </p>
+                    </div>
+                  )}
+                  {property.softDeleted && (
+                    <div className="grid grid-cols-2 gap-4">
+                      {property.createdAt && (
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground">
+                            Deleted At
+                          </p>
+                          <p className="text-sm">
+                            {formatDate(property.softDeletedAt)}
+                          </p>
+                        </div>
+                      )}
+                      {property.lastUpdatedAt && (
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground">
+                            Deleted By
+                          </p>
+                          <p className="text-sm">{property.softDeleteBy}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>

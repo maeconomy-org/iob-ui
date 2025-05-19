@@ -141,7 +141,7 @@ export default function ObjectChildrenPage() {
   return (
     <div className="flex flex-col flex-1">
       <div className="container mx-auto px-4">
-        <Breadcrumbs />
+        {/* <Breadcrumbs /> */}
 
         <div className="mb-6 flex justify-between items-center">
           <div>

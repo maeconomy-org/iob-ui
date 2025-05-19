@@ -59,16 +59,16 @@ export function ObjectViewContainer({
         />
       )
 
-    case 'columns':
-      return (
-        <ObjectColumnsView
-          data={data}
-          availableModels={availableModels}
-          onViewObject={onViewObject}
-          onEditObject={onEditObject}
-          onSaveObject={onSaveObject}
-        />
-      )
+    // case 'columns':
+    //   return (
+    //     <ObjectColumnsView
+    //       data={data}
+    //       availableModels={availableModels}
+    //       onViewObject={onViewObject}
+    //       onEditObject={onEditObject}
+    //       onSaveObject={onSaveObject}
+    //     />
+    //   )
 
     default:
       return (

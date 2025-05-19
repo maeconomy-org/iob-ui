@@ -11,7 +11,9 @@ export function useProperties() {
     return useQuery({
       queryKey: ['properties'],
       queryFn: async () => {
-        const response = await client.properties.api.getAll()
+        const response = await client.properties.api.getOwn({
+          softDeleted: false,
+        })
         return response.data
       },
       ...options,
@@ -133,6 +135,51 @@ export function useProperties() {
     })
   }
 
+  // Update property with values (combined operation)
+  const useUpdatePropertyWithValues = () => {
+    return useMutation({
+      mutationFn: async ({
+        property,
+        values = [],
+      }: {
+        property: UUPropertyDTO
+        values?: Array<{ uuid?: string; value: string; valueTypeCast?: string }>
+      }) => {
+        // Then process each value
+        for (const value of values) {
+          if (value.uuid) {
+            // Update existing value
+            await client.values.api.create({
+              uuid: value.uuid,
+              value: value.value,
+              valueTypeCast: value.valueTypeCast || 'string',
+            })
+          } else {
+            // Add new value to the property
+            await client.values.setForProperty(property.uuid, {
+              value: value.value,
+              valueTypeCast: value.valueTypeCast || 'string',
+            })
+          }
+        }
+
+        // Return the updated property
+        const response = await client.properties.api.getById(property.uuid)
+        return response.data
+      },
+      onSuccess: (updatedProperty) => {
+        // Invalidate all the caches that might be affected
+        if (updatedProperty) {
+          queryClient.invalidateQueries({
+            queryKey: ['property', updatedProperty.uuid],
+          })
+        }
+        queryClient.invalidateQueries({ queryKey: ['propertyValue'] })
+        queryClient.invalidateQueries({ queryKey: ['object'] })
+      },
+    })
+  }
+
   return {
     useAllProperties,
     useProperty,
@@ -142,5 +189,6 @@ export function useProperties() {
     useAddPropertyToObject,
     usePropertyValue,
     useSetPropertyValue,
+    useUpdatePropertyWithValues,
   }
 }

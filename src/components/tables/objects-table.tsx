@@ -41,25 +41,13 @@ interface ObjectsTableProps {
 }
 
 const isObjectDeleted = (object: any) => {
-  // Check if object has a system:softDeleted property with value true
-  if (!object || !object.properties) return false
+  if (!object || !object.softDeleted) return false
 
-  const softDeletedProp = object.properties.find(
-    (p: any) =>
-      p.property?.key === 'system:softDeleted' || p.key === 'system:softDeleted'
-  )
+  const softDeletedProp = object.softDeleted !== null
 
   if (!softDeletedProp) return false
 
-  // Check the value - could be in different formats depending on API
-  // Look for the value in the values array first
-  if (softDeletedProp.values && softDeletedProp.values.length > 0) {
-    const valueObj = softDeletedProp.values[0]
-    return valueObj.value === true || valueObj.value === 'true'
-  }
-
-  // Or check direct value property
-  return softDeletedProp.value === true || softDeletedProp.value === 'true'
+  return true
 }
 
 export function ObjectsTable({
@@ -243,16 +231,6 @@ export function ObjectsTable({
                     View Details
                   </DropdownMenuItem>
 
-                  <DropdownMenuItem
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleShowQRCode(object, e)
-                    }}
-                  >
-                    <QrCode className="mr-2 h-4 w-4" />
-                    Show QR Code
-                  </DropdownMenuItem>
-
                   {onEditObject && (
                     <DropdownMenuItem
                       onClick={(e) => {
@@ -265,16 +243,18 @@ export function ObjectsTable({
                     </DropdownMenuItem>
                   )}
 
-                  <DropdownMenuItem
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setObjectToDelete(object)
-                      setIsDeleteModalOpen(true)
-                    }}
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete
-                  </DropdownMenuItem>
+                  {!isDeleted && (
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setObjectToDelete(object)
+                        setIsDeleteModalOpen(true)
+                      }}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
+                    </DropdownMenuItem>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>

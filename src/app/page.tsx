@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { HelpCircle, ArrowRight, Check } from 'lucide-react'
 import Link from 'next/link'
 
+import { useCommonApi } from '@/hooks/api'
 import { Card, Button } from '@/components/ui'
 
 export default function AuthPage() {
@@ -13,6 +14,10 @@ export default function AuthPage() {
     'idle' | 'authorizing' | 'success' | 'error'
   >('idle')
   const [error, setError] = useState<string | null>(null)
+
+  const { useRequestCertificate } = useCommonApi()
+
+  const requestCertificate = useRequestCertificate()
 
   // Check if we have an existing auth session
   useEffect(() => {
@@ -41,27 +46,10 @@ export default function AuthPage() {
 
     try {
       // Initiate auth flow
-      const mainServerResponse = await fetch(
-        'https://maeconomy.recheck.io:9443/api/cert',
-        {
-          method: 'GET',
-          credentials: 'include', // Important for certificate handling
-        }
-      )
+      const response = await requestCertificate.mutateAsync()
+      console.log('Response:', response)
 
-      if (!mainServerResponse.ok) {
-        throw new Error('Authorization failed')
-      }
-
-      const uuidServerResponse = await fetch(
-        'https://maeconomy.recheck.io:8443/api/UUIDOwner',
-        {
-          method: 'GET',
-          credentials: 'include', // Important for certificate handling
-        }
-      )
-
-      if (!uuidServerResponse.ok) {
+      if (response.uuid.status !== 200 || response.base.status !== 200) {
         throw new Error('Authorization failed')
       }
 
@@ -77,7 +65,7 @@ export default function AuthPage() {
       // Redirect to main app
       router.push('/objects')
     } catch (err) {
-      console.log(err)
+      console.log('Error:', err)
       setStatus('error')
       setError(
         'Authorization failed. Please ensure you have a valid certificate.'

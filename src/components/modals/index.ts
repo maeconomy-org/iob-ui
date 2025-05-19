@@ -1,5 +1,3 @@
-export * from './object-details-modal'
-
 export * from './file-management-modal'
 export * from './property-details-modal'
 export * from './property-management-modal'

@@ -56,7 +56,7 @@ export function ViewSelector({ view, onChange }: ViewSelectorProps) {
           <TooltipContent side="bottom">Explorer View</TooltipContent>
         </Tooltip>
 
-        <Tooltip>
+        {/* <Tooltip>
           <TooltipTrigger
             className={cn('hover:bg-muted', view === 'columns' && 'bg-muted')}
             asChild
@@ -66,7 +66,7 @@ export function ViewSelector({ view, onChange }: ViewSelectorProps) {
             </ToggleGroupItem>
           </TooltipTrigger>
           <TooltipContent side="bottom">Columns View</TooltipContent>
-        </Tooltip>
+        </Tooltip> */}
       </ToggleGroup>
     </TooltipProvider>
   )
