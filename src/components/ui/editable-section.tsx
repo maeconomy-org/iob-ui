@@ -1,0 +1,96 @@
+import { ReactNode, useState } from 'react'
+import { Edit, Save, X } from 'lucide-react'
+import { toast } from 'sonner'
+
+import { Button } from '@/components/ui/button'
+
+interface EditableSectionProps {
+  title: string
+  isEditing: boolean
+  onEditToggle: (isEditing: boolean) => void
+  renderDisplay: () => ReactNode
+  renderEdit: () => ReactNode
+  onSave?: () => Promise<void> | void
+  successMessage?: string
+}
+
+export function EditableSection({
+  title,
+  isEditing,
+  onEditToggle,
+  renderDisplay,
+  renderEdit,
+  onSave,
+  successMessage = 'Changes saved successfully',
+}: EditableSectionProps) {
+  const [isSaving, setIsSaving] = useState(false)
+
+  const handleSave = async () => {
+    if (!onSave) {
+      onEditToggle(false)
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      await onSave()
+      onEditToggle(false)
+
+      // Show a success toast with Sonner
+      toast.success(successMessage)
+    } catch (error) {
+      console.error('Error saving section:', error)
+
+      // Show an error toast with Sonner
+      toast.error('Failed to save changes. Please try again.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  return (
+    <div className="mb-6">
+      <div className="flex justify-between items-center mb-3">
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+          {title}
+        </h3>
+
+        {isEditing ? (
+          <div className="flex space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onEditToggle(false)}
+              disabled={isSaving}
+            >
+              <X className="h-4 w-4 mr-2" />
+              Cancel
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleSave}
+              disabled={isSaving}
+            >
+              <Save className="h-4 w-4 mr-2" />
+              {isSaving ? 'Saving...' : 'Save'}
+            </Button>
+          </div>
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onEditToggle(true)}
+          >
+            <Edit className="h-4 w-4 mr-2" />
+            Edit
+          </Button>
+        )}
+      </div>
+
+      <div className="bg-card rounded-md border p-4">
+        {isEditing ? renderEdit() : renderDisplay()}
+      </div>
+    </div>
+  )
+}

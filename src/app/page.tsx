@@ -7,38 +7,26 @@ import Link from 'next/link'
 
 import { useCommonApi } from '@/hooks/api'
 import { Card, Button } from '@/components/ui'
+import { useAuth } from '@/contexts/auth-context'
 
 export default function AuthPage() {
   const router = useRouter()
+  const { isAuthenticated, login } = useAuth()
   const [status, setStatus] = useState<
     'idle' | 'authorizing' | 'success' | 'error'
   >('idle')
   const [error, setError] = useState<string | null>(null)
 
   const { useRequestCertificate } = useCommonApi()
-
   const requestCertificate = useRequestCertificate()
 
-  // Check if we have an existing auth session
+  // Check if we're already authenticated
   useEffect(() => {
-    try {
-      const authData = sessionStorage.getItem('auth_status')
-      if (authData) {
-        const parsed = JSON.parse(authData)
-        if (parsed.authenticated && parsed.timestamp) {
-          const authTime = new Date(parsed.timestamp)
-          const now = new Date()
-          // If authenticated within the last hour, consider it valid and redirect
-          if (now.getTime() - authTime.getTime() < 60 * 60 * 1000) {
-            setStatus('success')
-            router.push('/objects')
-          }
-        }
-      }
-    } catch (e) {
-      console.error('Error reading auth status:', e)
+    if (isAuthenticated) {
+      setStatus('success')
+      router.push('/objects')
     }
-  }, [router])
+  }, [isAuthenticated, router])
 
   const handleAuthorize = async () => {
     setStatus('authorizing')
@@ -53,14 +41,18 @@ export default function AuthPage() {
         throw new Error('Authorization failed')
       }
 
+      // Extract username from the response
+      const username = response.base.data?.username
+
       // If we get here, certificate was accepted
       setStatus('success')
 
-      // Store auth state
-      sessionStorage.setItem(
-        'auth_status',
-        JSON.stringify({ authenticated: true, timestamp: Date.now() })
-      )
+      // Login using auth context
+      login({
+        authenticated: true,
+        timestamp: Date.now(),
+        username,
+      })
 
       // Redirect to main app
       router.push('/objects')

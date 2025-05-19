@@ -182,6 +182,9 @@ export function useObjects() {
           queryClient.invalidateQueries({
             queryKey: ['object', data.object.uuid, 'withProperties'],
           })
+          queryClient.invalidateQueries({
+            queryKey: ['object', data.object.uuid, 'full'],
+          })
         }
 
         // For parent relationships, we'll need to check statements
@@ -189,6 +192,49 @@ export function useObjects() {
         queryClient.invalidateQueries({
           queryKey: ['objects', 'children'],
         })
+      },
+    })
+  }
+
+  // Update object metadata only
+  const useUpdateObjectMetadata = () => {
+    return useMutation({
+      mutationFn: async ({
+        uuid,
+        name,
+        abbreviation,
+        version,
+        description,
+      }: {
+        uuid: UUID
+        name?: string
+        abbreviation?: string
+        version?: string
+        description?: string
+      }) => {
+        // Only update the object's metadata fields via the standard API
+        const response = await client.objects.api.create({
+          uuid,
+          name,
+          abbreviation,
+          version,
+          description,
+        })
+        return response.data
+      },
+      onSuccess: (data) => {
+        if (data?.uuid) {
+          // Invalidate just the object queries, not the entire objects collection
+          queryClient.invalidateQueries({
+            queryKey: ['object', data.uuid],
+          })
+          queryClient.invalidateQueries({
+            queryKey: ['object', data.uuid, 'withProperties'],
+          })
+          queryClient.invalidateQueries({
+            queryKey: ['object', data.uuid, 'full'],
+          })
+        }
       },
     })
   }
@@ -243,6 +289,7 @@ export function useObjects() {
     useCreateObjectWithProperties,
     useCreateFullObject,
     useUpdateObject,
+    useUpdateObjectMetadata,
     useDeleteObject,
     useAddChildToObject,
   }

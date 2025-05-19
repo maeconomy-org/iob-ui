@@ -1,10 +1,10 @@
 'use client'
 
+import { Loader2 } from 'lucide-react'
+
 import { ViewType } from '@/components/view-selector'
 import { ObjectsTable } from '@/components/tables'
-import { ObjectColumnsView } from './columns-view'
-import { ObjectExplorerView } from './explorer-view'
-import { Loader2 } from 'lucide-react'
+import { ObjectExplorer } from './object-explorer'
 
 interface ObjectViewContainerProps {
   viewType: ViewType
@@ -43,21 +43,11 @@ export function ObjectViewContainer({
           initialData={data}
           availableModels={availableModels}
           onViewObject={onViewObject}
-          onEditObject={onEditObject}
-          onSaveObject={onSaveObject}
         />
       )
 
     case 'explorer':
-      return (
-        <ObjectExplorerView
-          data={data}
-          availableModels={availableModels}
-          onViewObject={onViewObject}
-          onEditObject={onEditObject}
-          onSaveObject={onSaveObject}
-        />
-      )
+      return <ObjectExplorer data={data} availableModels={availableModels} />
 
     // case 'columns':
     //   return (

@@ -1,26 +1,18 @@
 'use client'
 
-import type React from 'react'
-
-import { useState, useEffect } from 'react'
+import { MouseEvent, useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   FileText,
   ChevronRight,
   ChevronDown,
-  Pencil,
   Trash2,
-  MoreHorizontal,
   QrCode,
 } from 'lucide-react'
+import { toast } from 'sonner'
 
-import { objectsData } from '@/lib/data'
 import {
   Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
   Table,
   TableBody,
   TableCell,
@@ -28,8 +20,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui'
-import { DeleteConfirmationDialog } from '@/components/modals'
-import { QRCodeModal } from '@/components/modals'
+import { useObjects } from '@/hooks'
+import { objectsData } from '@/lib/data'
+import { QRCodeModal, DeleteConfirmationDialog } from '@/components/modals'
 
 interface ObjectsTableProps {
   initialData?: any[]
@@ -42,21 +35,13 @@ interface ObjectsTableProps {
 
 const isObjectDeleted = (object: any) => {
   if (!object || !object.softDeleted) return false
-
-  const softDeletedProp = object.softDeleted !== null
-
-  if (!softDeletedProp) return false
-
-  return true
+  return object.softDeleted === true
 }
 
 export function ObjectsTable({
   initialData,
   showParentLink = true,
-  availableModels = [],
   onViewObject,
-  onEditObject,
-  onSaveObject,
 }: ObjectsTableProps) {
   const router = useRouter()
   const [data, setData] = useState<any[]>([])
@@ -66,6 +51,10 @@ export function ObjectsTable({
   const [objectToDelete, setObjectToDelete] = useState<any>(null)
   const [isQRCodeModalOpen, setIsQRCodeModalOpen] = useState(false)
   const [selectedQRObject, setSelectedQRObject] = useState<any>(null)
+
+  // Get the delete mutation
+  const { useDeleteObject } = useObjects()
+  const { mutateAsync: deleteObject } = useDeleteObject()
 
   // Load data from props or from the data file
   useEffect(() => {
@@ -85,34 +74,51 @@ export function ObjectsTable({
     }
   }
 
-  const handleDelete = (uuid: string) => {
-    // Implement soft delete logic
-    const updateObject = (objects: any[]): any[] => {
-      return objects.map((obj) => {
-        if (obj.uuid === uuid) {
-          return {
-            ...obj,
-            isDeleted: true,
-            deletedAt: new Date().toISOString(),
-          }
-        }
-        if (obj.children && obj.children.length > 0) {
-          return { ...obj, children: updateObject(obj.children) }
-        }
-        return obj
-      })
-    }
+  // Update the delete handler to use the API mutation
+  const handleDeleteConfirm = async (uuid: string) => {
+    try {
+      await deleteObject(uuid)
+      // Show a success toast
+      toast.success('Object deleted successfully')
 
-    setData(updateObject(data))
+      // Update the local data to reflect the deletion
+      // This assumes the API doesn't automatically trigger a refetch
+      setData((prev) => {
+        const updateDeleted = (items: any[]): any[] => {
+          return items.map((item) => {
+            if (item.uuid === uuid) {
+              return {
+                ...item,
+                softDeleted: true,
+                softDeletedAt: new Date().toISOString(),
+              }
+            }
+            if (item.children && item.children.length > 0) {
+              return {
+                ...item,
+                children: updateDeleted(item.children),
+              }
+            }
+            return item
+          })
+        }
+        return updateDeleted(prev)
+      })
+
+      setIsDeleteModalOpen(false)
+    } catch (error) {
+      console.error('Error deleting object:', error)
+      toast.error('Failed to delete object')
+    }
   }
 
-  const handleShowQRCode = (object: any, e: React.MouseEvent) => {
+  const handleShowQRCode = (object: any, e: MouseEvent) => {
     e.stopPropagation()
     setSelectedQRObject(object)
     setIsQRCodeModalOpen(true)
   }
 
-  const toggleRow = (uuid: string, e: React.MouseEvent) => {
+  const toggleRow = (uuid: string, e: MouseEvent) => {
     e.stopPropagation()
     setExpandedRows((prev) => ({
       ...prev,
@@ -210,53 +216,19 @@ export function ObjectsTable({
                 <FileText className="h-4 w-4" />
               </Button>
 
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleViewDetails(object)
-                    }}
-                  >
-                    <FileText className="mr-2 h-4 w-4" />
-                    View Details
-                  </DropdownMenuItem>
-
-                  {onEditObject && (
-                    <DropdownMenuItem
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onEditObject(object)
-                      }}
-                    >
-                      <Pencil className="mr-2 h-4 w-4" />
-                      Edit
-                    </DropdownMenuItem>
-                  )}
-
-                  {!isDeleted && (
-                    <DropdownMenuItem
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setObjectToDelete(object)
-                        setIsDeleteModalOpen(true)
-                      }}
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {!isDeleted && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setObjectToDelete(object)
+                    setIsDeleteModalOpen(true)
+                  }}
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              )}
             </div>
           </TableCell>
         </TableRow>,
@@ -299,8 +271,7 @@ export function ObjectsTable({
         objectName={objectToDelete?.name || 'this object'}
         onDelete={() => {
           if (objectToDelete) {
-            handleDelete(objectToDelete.uuid)
-            setIsDeleteModalOpen(false)
+            handleDeleteConfirm(objectToDelete.uuid)
           }
         }}
       />

@@ -1,0 +1,114 @@
+'use client'
+
+import { useState, useMemo } from 'react'
+
+import { useObjects } from '@/hooks'
+import { DeleteConfirmationDialog } from '@/components/modals'
+import { filterObjectsBySearchTerm } from '@/lib/explorer-view-utils'
+
+import { SearchBar } from './explorer-view/search-bar'
+import { TreeItem } from './explorer-view/tree-item'
+import { DetailsPanel } from './explorer-view/details-panel'
+import type { ObjectItem } from './explorer-view/tree-item'
+
+interface ObjectExplorerProps {
+  data: ObjectItem[]
+  availableModels: any[]
+  onViewObject?: (object: any) => void
+  onEditObject?: (object: any) => void
+  onSaveObject?: (object: any) => void
+}
+
+export function ObjectExplorer({ data, availableModels }: ObjectExplorerProps) {
+  // State management
+  const [expandedItems, setExpandedItems] = useState<string[]>([])
+  const [selectedItem, setSelectedItem] = useState<ObjectItem | null>(null)
+  const [search, setSearch] = useState('')
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [objectToDelete, setObjectToDelete] = useState<ObjectItem | null>(null)
+
+  // Get the delete mutation from hooks
+  const { useDeleteObject } = useObjects()
+  const { mutateAsync: deleteObject } = useDeleteObject()
+
+  // Filter objects based on search
+  const filteredObjects = useMemo(() => {
+    return filterObjectsBySearchTerm(data, search)
+  }, [search, data])
+
+  // Handle delete action
+  const handleDelete = (item: ObjectItem) => {
+    setObjectToDelete(item)
+    setIsDeleteModalOpen(true)
+  }
+
+  // Handle confirming deletion
+  const handleDeleteConfirm = async (uuid: string) => {
+    try {
+      await deleteObject(uuid)
+      // Remove the deleted object from selection if it was selected
+      if (selectedItem?.uuid === uuid) {
+        setSelectedItem(null)
+      }
+      setIsDeleteModalOpen(false)
+    } catch (error) {
+      console.error('Error deleting object:', error)
+    }
+  }
+
+  return (
+    <>
+      <div className="flex space-x-4 h-[calc(100vh-180px)]">
+        {/* Left side: Explorer tree with search */}
+        <div className="w-1/3 border rounded-md flex flex-col">
+          <div className="p-2 border-b">
+            <SearchBar value={search} onChange={setSearch} />
+          </div>
+
+          <div className="flex-1 overflow-auto p-1">
+            {filteredObjects.length > 0 ? (
+              filteredObjects.map((item) => (
+                <TreeItem
+                  key={item.uuid}
+                  item={item}
+                  expandedItems={expandedItems}
+                  setExpandedItems={setExpandedItems}
+                  selectedItem={selectedItem}
+                  setSelectedItem={setSelectedItem}
+                  availableModels={availableModels}
+                />
+              ))
+            ) : (
+              <div className="p-4 text-center text-muted-foreground">
+                No objects found
+              </div>
+            )}
+          </div>
+
+          <div className="p-2 border-t bg-muted/50 text-xs text-muted-foreground">
+            {filteredObjects.length} root objects
+          </div>
+        </div>
+
+        {/* Right side: Details panel */}
+        <div className="w-2/3 border rounded-md overflow-hidden flex flex-col">
+          <DetailsPanel
+            item={selectedItem}
+            availableModels={availableModels}
+            onDelete={handleDelete}
+          />
+        </div>
+      </div>
+
+      {/* Delete Confirmation Dialog */}
+      {isDeleteModalOpen && objectToDelete && (
+        <DeleteConfirmationDialog
+          open={isDeleteModalOpen}
+          onOpenChange={setIsDeleteModalOpen}
+          objectName={objectToDelete.name}
+          onDelete={() => handleDeleteConfirm(objectToDelete.uuid)}
+        />
+      )}
+    </>
+  )
+}
