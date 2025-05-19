@@ -1,4 +1,6 @@
-export const API_CONFIG = {
+import { IOBClientConfig } from 'iob-client'
+
+export const API_CONFIG: IOBClientConfig = {
   baseUrl:
     process.env.NEXT_PUBLIC_BASE_API_URL || 'https://maeconomy.recheck.io:9443',
   uuidServiceBaseUrl:
@@ -6,6 +8,7 @@ export const API_CONFIG = {
 
   debug: {
     enabled: true,
-    logLevel: 'debug',
+    logLevel: 'error',
+    logToConsole: true,
   },
 }

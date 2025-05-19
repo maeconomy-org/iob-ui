@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { toast } from 'sonner'
 import {
-  FileText,
   Edit,
   Trash2,
   Loader2,
@@ -11,7 +11,6 @@ import {
   Clock,
 } from 'lucide-react'
 
-import { PropertyDetailsModal } from '@/components/modals'
 import {
   Badge,
   Button,
@@ -25,8 +24,14 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
+  Input,
+  Textarea,
+  Label,
+  EditableSection,
 } from '@/components/ui'
+import { PropertySectionEditor } from '@/components/properties'
 import { useObjects, usePropertyManagement } from '@/hooks'
+import { formatPropertyValue } from '@/lib/object-utils'
 
 interface ObjectSheetProps {
   isOpen: boolean
@@ -52,7 +57,14 @@ export function ObjectDetailsSheet({
   onSave,
 }: ObjectSheetProps) {
   // Get the useFullObject hook to fetch the complete object data
-  const { useFullObject } = useObjects()
+  const { useFullObject, useUpdateObjectMetadata, useDeleteObject } =
+    useObjects()
+
+  // Get the specialized metadata update mutation
+  const updateObjectMetadataMutation = useUpdateObjectMetadata()
+
+  // Get delete mutation
+  const deleteObjectMutation = useDeleteObject()
 
   // Fetch the full object details if a UUID is provided
   const { data: fullObjectData, isLoading } = useFullObject(uuid || '', {
@@ -116,8 +128,30 @@ export function ObjectDetailsSheet({
 
   // State for property and file management
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
-  const [selectedProperty, setSelectedProperty] = useState<any>(null)
-  const [isPropertyDetailsOpen, setIsPropertyDetailsOpen] = useState(false)
+
+  // Section editing states - combined into a single activeEditingSection state
+  const [activeEditingSection, setActiveEditingSection] = useState<
+    string | null
+  >(null)
+  const isMetadataEditing = activeEditingSection === 'metadata'
+  const isPropertiesEditing = activeEditingSection === 'properties'
+
+  // State for expanded property in view mode
+  const [expandedPropertyId, setExpandedPropertyId] = useState<string | null>(
+    null
+  )
+
+  // Temporary editing states
+  const [editedObject, setEditedObject] = useState<any>(null)
+  const [editedProperties, setEditedProperties] = useState<any[]>([])
+
+  // Set up initial editing states when object changes
+  useMemo(() => {
+    if (object) {
+      setEditedObject({ ...object })
+      setEditedProperties(properties || [])
+    }
+  }, [object, properties])
 
   // Exit early if no object and still loading
   if (!object && isOpen && !isLoading) {
@@ -129,79 +163,149 @@ export function ObjectDetailsSheet({
     ? availableModels.find((m) => m.uuid === object.modelUuid)
     : null
 
-  const formatPropertyValue = (property: any) => {
-    // Handle property with values array in new structure
-    if (property.values && property.values.length > 0) {
-      return property.values
-        .filter((v: any) => v && v.value && !v.softDeleted)
-        .map((v: any) => v.value)
-        .join(', ')
-    }
+  // Use our property management hook
+  const {
+    updatePropertyWithValues,
+    createPropertyForObject,
+    removePropertyFromObject,
+    isLoading: isPropertyUpdateLoading,
+  } = usePropertyManagement(object?.uuid)
 
-    // Handle property with single value
-    if (typeof property.value === 'string') {
-      return property.value
-    }
-
-    return ''
+  // Function to toggle property expansion
+  const togglePropertyExpansion = (propertyId: string) => {
+    setExpandedPropertyId((prevId) =>
+      prevId === propertyId ? null : propertyId
+    )
   }
 
-  const handlePropertyClick = (property: any) => {
-    setSelectedProperty(property)
-    setIsPropertyDetailsOpen(true)
-  }
-
-  // Use our new property management hook instead
-  const { updatePropertyWithValues, isLoading: isPropertyUpdateLoading } =
-    usePropertyManagement(object?.uuid)
-
-  const handleSaveProperty = async (updatedProperty: any) => {
-    console.log('updatedProperty', updatedProperty)
+  // Handle saving changes to object metadata
+  const handleSaveMetadata = async (): Promise<void> => {
+    if (!editedObject || !object) return
 
     try {
-      // Use our more comprehensive hook to update the property
-      await updatePropertyWithValues(
+      // Check if anything has actually changed before calling onSave
+      const hasChanged =
+        editedObject.name !== object.name ||
+        editedObject.abbreviation !== object.abbreviation ||
+        editedObject.version !== object.version ||
+        editedObject.description !== object.description
+
+      if (!hasChanged) {
+        // No changes, just close the editing mode
+        setActiveEditingSection(null)
+        return
+      }
+
+      // Show loading toast
+      toast.promise(
+        updateObjectMetadataMutation.mutateAsync({
+          uuid: object.uuid,
+          name: editedObject.name,
+          abbreviation: editedObject.abbreviation,
+          version: editedObject.version,
+          description: editedObject.description,
+        }),
         {
-          uuid: updatedProperty.uuid,
-          key: updatedProperty.key,
-          // Include optional metadata if available
-          ...(updatedProperty.label && { label: updatedProperty.label }),
-          ...(updatedProperty.description && {
-            description: updatedProperty.description,
-          }),
-          ...(updatedProperty.type && { type: updatedProperty.type }),
-        },
-        // Include all values from the property
-        updatedProperty.values || []
+          loading: 'Updating object metadata...',
+          success: 'Object metadata updated successfully',
+          error: 'Failed to update object metadata',
+        }
       )
 
-      // Find the property in the object's properties array
-      const updatedProperties = properties.map((prop: any) =>
-        prop.uuid === updatedProperty.uuid ? updatedProperty : prop
-      )
-
-      console.log('updatedProperties', updatedProperties)
-
-      // Create updated object with the modified properties
-      const updatedObject = {
-        ...object,
-        properties: updatedProperties,
-      }
-
-      console.log('updatedObject', updatedObject)
-
-      // Call the parent's save function if provided
-      if (onSave) {
-        onSave(updatedObject)
-      }
+      setActiveEditingSection(null)
     } catch (error) {
-      console.error('Error updating property:', error)
+      console.error('Error saving metadata:', error)
+      toast.error('Failed to update object metadata')
     }
-
-    setIsPropertyDetailsOpen(false)
   }
 
-  const isObjectDeleted = object?.softDeleted || isDeleted
+  // Handle saving changes to properties
+  const handleSaveProperties = async (): Promise<void> => {
+    if (!editedProperties || !object) return
+
+    try {
+      // Check if any properties have been modified, added or deleted
+      const hasChanges = editedProperties.some(
+        (prop) => prop._isNew || prop._deleted || prop._modified
+      )
+
+      if (!hasChanges) {
+        // No changes, just close the editing mode
+        setActiveEditingSection(null)
+        return
+      }
+
+      // Show loading toast
+      toast.promise(
+        async () => {
+          // Process each property
+          for (const property of editedProperties) {
+            if (property._deleted) {
+              // Delete property if marked for deletion
+              await removePropertyFromObject(object.uuid, property.uuid)
+            } else if (property._isNew) {
+              // Create new property with only key and values
+              await createPropertyForObject(object.uuid, {
+                key: property.key,
+                values: property.values || [],
+              })
+            } else if (property._modified) {
+              // Only update existing property if it was modified
+              // Just use the key field and values
+              await updatePropertyWithValues(
+                {
+                  uuid: property.uuid,
+                  key: property.key,
+                },
+                property.values || []
+              )
+            }
+          }
+        },
+        {
+          loading: 'Updating object properties...',
+          success: 'Object properties updated successfully',
+          error: 'Failed to update object properties',
+        }
+      )
+
+      setActiveEditingSection(null)
+    } catch (error) {
+      console.error('Error saving properties:', error)
+      toast.error('Failed to update object properties')
+    }
+  }
+
+  // Handle section edit toggling
+  const handleEditToggle = (section: string, isEditing: boolean) => {
+    if (isEditing) {
+      // Activate this section
+      setActiveEditingSection(section)
+    } else {
+      // Deactivate only if this section is active
+      if (activeEditingSection === section) {
+        setActiveEditingSection(null)
+      }
+    }
+  }
+
+  // Handle object deletion
+  const handleDeleteObject = async (objectId: string) => {
+    if (!objectId) return
+
+    try {
+      toast.promise(deleteObjectMutation.mutateAsync(objectId), {
+        loading: 'Deleting object...',
+        success: 'Object deleted successfully',
+        error: 'Failed to delete object',
+      })
+
+      // Close the sheet after deletion
+      onClose()
+    } catch (error) {
+      console.error('Error deleting object:', error)
+    }
+  }
 
   return (
     <>
@@ -210,7 +314,9 @@ export function ObjectDetailsSheet({
           <SheetHeader>
             <span className="flex items-center gap-2">
               <SheetTitle>{object?.name}</SheetTitle>
-              {isObjectDeleted && <Badge variant="destructive">Deleted</Badge>}
+              {(object?.softDeleted || isDeleted) && (
+                <Badge variant="destructive">Deleted</Badge>
+              )}
             </span>
             {model && (
               <SheetDescription>
@@ -227,157 +333,288 @@ export function ObjectDetailsSheet({
             </div>
           ) : (
             <div className="space-y-6 py-6">
-              {/* Metadata Section */}
-              <div>
-                <div className="grid grid-cols-1 gap-3">
-                  <div>
-                    <div className="text-sm font-medium">UUID</div>
-                    <div className="text-sm font-mono text-muted-foreground">
-                      {object?.uuid}
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
+              {/* Metadata Section - Now Editable */}
+              <EditableSection
+                title="Object Metadata"
+                isEditing={isMetadataEditing}
+                onEditToggle={(isEditing) =>
+                  handleEditToggle('metadata', isEditing)
+                }
+                onSave={handleSaveMetadata}
+                successMessage="Object metadata updated successfully"
+                renderDisplay={() => (
+                  <div className="grid grid-cols-1 gap-3">
                     <div>
-                      <div className="text-sm font-medium">Name</div>
-                      <div className="text-sm text-muted-foreground">
-                        {object?.name}
+                      <div className="text-sm font-medium">UUID</div>
+                      <div className="text-sm font-mono text-muted-foreground">
+                        {object?.uuid}
                       </div>
                     </div>
-                    {object?.abbreviation && (
+                    <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <div className="text-sm font-medium">Abbreviation</div>
+                        <div className="text-sm font-medium">Name</div>
                         <div className="text-sm text-muted-foreground">
-                          {object?.abbreviation}
+                          {object?.name}
                         </div>
                       </div>
-                    )}
-                    {object?.version && (
-                      <div>
-                        <div className="text-sm font-medium">Version</div>
-                        <div className="text-sm text-muted-foreground">
-                          {object?.version}
-                        </div>
-                      </div>
-                    )}
-                    {object?.description && (
-                      <div>
-                        <div className="text-sm font-medium">Description</div>
-                        <div className="text-sm text-muted-foreground">
-                          {object?.description}
-                        </div>
-                      </div>
-                    )}
-                    <div>
-                      <div className="text-sm font-medium">Created</div>
-                      <div className="text-sm text-muted-foreground">
-                        {object?.createdAt &&
-                          new Date(object.createdAt).toLocaleString()}
-                      </div>
-                    </div>
-                    {object?.lastUpdatedAt && (
-                      <div>
-                        <div className="text-sm font-medium">Updated</div>
-                        <div className="text-sm text-muted-foreground">
-                          {new Date(object.lastUpdatedAt).toLocaleString()}
-                        </div>
-                      </div>
-                    )}
-                    {/* Display soft delete metadata if object is deleted */}
-                    {isObjectDeleted && (
-                      <>
+                      {object?.abbreviation && (
                         <div>
-                          <div className="text-sm font-medium text-destructive">
-                            Deleted At
+                          <div className="text-sm font-medium">
+                            Abbreviation
                           </div>
                           <div className="text-sm text-muted-foreground">
-                            {object?.softDeletedAt &&
-                              new Date(object.softDeletedAt).toLocaleString()}
+                            {object?.abbreviation}
                           </div>
                         </div>
-                        {object?.softDeleteBy && (
+                      )}
+                      {object?.version && (
+                        <div>
+                          <div className="text-sm font-medium">Version</div>
+                          <div className="text-sm text-muted-foreground">
+                            {object?.version}
+                          </div>
+                        </div>
+                      )}
+                      {object?.description && (
+                        <div>
+                          <div className="text-sm font-medium">Description</div>
+                          <div className="text-sm text-muted-foreground">
+                            {object?.description}
+                          </div>
+                        </div>
+                      )}
+                      <div>
+                        <div className="text-sm font-medium">Created</div>
+                        <div className="text-sm text-muted-foreground">
+                          {object?.createdAt &&
+                            new Date(object.createdAt).toLocaleString()}
+                        </div>
+                      </div>
+                      {object?.lastUpdatedAt && (
+                        <div>
+                          <div className="text-sm font-medium">Updated</div>
+                          <div className="text-sm text-muted-foreground">
+                            {new Date(object.lastUpdatedAt).toLocaleString()}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Display soft delete metadata if object is deleted */}
+                      {(object?.softDeleted || isDeleted) && (
+                        <>
                           <div>
                             <div className="text-sm font-medium text-destructive">
-                              Deleted By
+                              Deleted At
                             </div>
-                            <div
-                              className="text-sm text-muted-foreground font-mono"
-                              title={object.softDeleteBy}
-                              aria-label={object.softDeleteBy}
-                            >
-                              {object.softDeleteBy.substring(
-                                object.softDeleteBy.length - 30
-                              )}
+                            <div className="text-sm text-muted-foreground">
+                              {object?.softDeletedAt &&
+                                new Date(object.softDeletedAt).toLocaleString()}
                             </div>
                           </div>
-                        )}
-                      </>
+                          {object?.softDeleteBy && (
+                            <div>
+                              <div className="text-sm font-medium text-destructive">
+                                Deleted By
+                              </div>
+                              <div
+                                className="text-sm text-muted-foreground font-mono"
+                                title={object.softDeleteBy}
+                                aria-label={object.softDeleteBy}
+                              >
+                                {object.softDeleteBy.substring(
+                                  object.softDeleteBy.length - 30
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+                renderEdit={() => (
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <Label htmlFor="object-name">Name</Label>
+                      <Input
+                        id="object-name"
+                        value={editedObject?.name || ''}
+                        onChange={(e) =>
+                          setEditedObject({
+                            ...editedObject,
+                            name: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="object-abbreviation">Abbreviation</Label>
+                      <Input
+                        id="object-abbreviation"
+                        value={editedObject?.abbreviation || ''}
+                        onChange={(e) =>
+                          setEditedObject({
+                            ...editedObject,
+                            abbreviation: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="object-version">Version</Label>
+                      <Input
+                        id="object-version"
+                        value={editedObject?.version || ''}
+                        onChange={(e) =>
+                          setEditedObject({
+                            ...editedObject,
+                            version: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="object-description">Description</Label>
+                      <Textarea
+                        id="object-description"
+                        value={editedObject?.description || ''}
+                        onChange={(e) =>
+                          setEditedObject({
+                            ...editedObject,
+                            description: e.target.value,
+                          })
+                        }
+                        rows={3}
+                      />
+                    </div>
+                  </div>
+                )}
+              />
+
+              {/* Properties Section - Now uses PropertySectionEditor */}
+              <Separator />
+              <EditableSection
+                title="Properties"
+                isEditing={isPropertiesEditing}
+                onEditToggle={(isEditing) =>
+                  handleEditToggle('properties', isEditing)
+                }
+                onSave={handleSaveProperties}
+                successMessage="Object properties updated successfully"
+                renderDisplay={() => (
+                  <div>
+                    {properties && properties.length > 0 ? (
+                      <div className="space-y-2">
+                        {properties.map((prop: any, idx: number) => (
+                          <div
+                            key={prop.uuid || idx}
+                            className="border rounded-md overflow-hidden"
+                          >
+                            {/* Property header - always visible */}
+                            <div
+                              className="grid grid-cols-3 gap-2 py-2 px-3 hover:bg-muted/20 cursor-pointer"
+                              onClick={() =>
+                                togglePropertyExpansion(
+                                  prop.uuid || `idx-${idx}`
+                                )
+                              }
+                            >
+                              <div className="font-medium text-sm flex items-center">
+                                <ChevronRight
+                                  className={`h-4 w-4 mr-2 transition-transform ${
+                                    expandedPropertyId ===
+                                    (prop.uuid || `idx-${idx}`)
+                                      ? 'rotate-90'
+                                      : ''
+                                  }`}
+                                />
+                                {prop.key}
+                              </div>
+                              <div className="col-span-2 text-sm">
+                                {formatPropertyValue(prop)}
+                              </div>
+                            </div>
+
+                            {/* Expanded content */}
+                            {expandedPropertyId ===
+                              (prop.uuid || `idx-${idx}`) && (
+                              <div className="border-t bg-muted/10 px-4 py-3">
+                                <div className="mb-4 space-y-3">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-sm text-muted-foreground">
+                                      UUID:
+                                    </span>
+                                    <span className="font-mono text-xs">
+                                      {prop.uuid || 'Not set'}
+                                    </span>
+                                  </div>
+
+                                  {prop.type && (
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-sm text-muted-foreground">
+                                        Type:
+                                      </span>
+                                      <span>{prop.type}</span>
+                                    </div>
+                                  )}
+
+                                  {prop.description && (
+                                    <div>
+                                      <span className="text-sm text-muted-foreground">
+                                        Description:
+                                      </span>
+                                      <p className="mt-1">{prop.description}</p>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Property Values Section */}
+                                <div>
+                                  <h4 className="font-medium mb-2">Values</h4>
+
+                                  <div className="space-y-2">
+                                    {(prop.values || []).map(
+                                      (value: any, index: number) => (
+                                        <div
+                                          key={value.uuid || `value-${index}`}
+                                          className="p-2 border rounded-md bg-background"
+                                        >
+                                          {value.value}
+                                        </div>
+                                      )
+                                    )}
+
+                                    {(!prop.values ||
+                                      prop.values.length === 0) && (
+                                      <div className="text-sm text-muted-foreground">
+                                        No values defined
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-muted-foreground bg-muted/20 rounded-md p-3">
+                        No properties defined for this object
+                      </div>
                     )}
                   </div>
-                </div>
-              </div>
-
-              {/* Properties Section */}
-              <Separator />
-              <div>
-                <div className="flex justify-between items-center mb-3">
-                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                    Properties
-                  </h3>
-                </div>
-
-                {properties && properties.length > 0 ? (
-                  <div className="space-y-2">
-                    {properties.map((prop: any, idx: number) => (
-                      <div
-                        key={prop.uuid || idx}
-                        className="grid grid-cols-3 gap-2 py-1 border-b border-muted last:border-0 hover:bg-muted/20 cursor-pointer"
-                        onClick={() => handlePropertyClick(prop)}
-                      >
-                        <div className="font-medium text-sm">{prop.key}</div>
-                        <div className="col-span-2 text-sm">
-                          {formatPropertyValue(prop)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-sm text-muted-foreground bg-muted/20 rounded-md p-3">
-                    No properties defined for this object
-                  </div>
                 )}
-              </div>
-
-              {/* Files Section */}
-              <Separator />
-              <div>
-                <div className="flex justify-between items-center mb-3">
-                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                    Files
-                  </h3>
-                </div>
-
-                {files && files.length > 0 ? (
-                  <div className="space-y-2">
-                    {files.map((file: any, idx: number) => (
-                      <div
-                        key={idx}
-                        className="flex items-center justify-between py-1 border-b border-muted last:border-0"
-                      >
-                        <div className="flex items-center">
-                          <FileText className="h-4 w-4 mr-2 text-muted-foreground" />
-                          <span className="text-sm">
-                            {file.label || file.name}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-sm text-muted-foreground bg-muted/20 rounded-md p-3">
-                    No files attached to this object
-                  </div>
+                renderEdit={() => (
+                  <PropertySectionEditor
+                    properties={editedProperties}
+                    isEditable={true}
+                    onUpdate={setEditedProperties}
+                  />
                 )}
-              </div>
+              />
 
               {/* Model Section (if applicable) */}
               {model && (
@@ -493,43 +730,25 @@ export function ObjectDetailsSheet({
           )}
 
           <SheetFooter className="border-t pt-4">
-            <div className="flex w-full justify-between items-center gap-2">
-              {onDelete && (
+            <div className="flex w-full items-center gap-2">
+              <Button type="button" onClick={onClose} className="w-full">
+                Close
+              </Button>
+              {!isDeleted && object?.uuid && (
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => onDelete(object?.uuid)}
-                  className="text-destructive"
+                  onClick={() => handleDeleteObject(object.uuid)}
+                  className="text-destructive w-full"
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
                   Delete
                 </Button>
               )}
-              <div className="flex gap-2">
-                {onEdit && (
-                  <Button type="button" variant="outline" onClick={onEdit}>
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit
-                  </Button>
-                )}
-                <Button type="button" onClick={onClose}>
-                  Close
-                </Button>
-              </div>
             </div>
           </SheetFooter>
         </SheetContent>
       </Sheet>
-
-      {/* Property Details Modal */}
-      {selectedProperty && (
-        <PropertyDetailsModal
-          property={selectedProperty}
-          isOpen={isPropertyDetailsOpen}
-          onClose={() => setIsPropertyDetailsOpen(false)}
-          onSave={handleSaveProperty}
-        />
-      )}
     </>
   )
 }

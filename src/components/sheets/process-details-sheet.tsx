@@ -190,22 +190,6 @@ export function ProcessDetailsSheet({
               </div>
             </div>
           </div>
-
-          {/* Files Section */}
-          <Separator />
-          <div>
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
-              Files
-            </h3>
-
-            <div className="flex flex-col items-center justify-center py-4 text-center">
-              <FileText className="h-10 w-10 text-muted-foreground mb-2" />
-              <h4 className="text-lg font-medium">No Files</h4>
-              <p className="text-sm text-muted-foreground">
-                This process doesn't have any files attached.
-              </p>
-            </div>
-          </div>
         </div>
 
         <SheetFooter className="border-t pt-4 mt-auto">

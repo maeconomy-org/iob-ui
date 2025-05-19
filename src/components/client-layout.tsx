@@ -1,7 +1,9 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
+
 import Navbar from '@/components/navbar'
+import { AuthProvider } from '@/contexts/auth-context'
 
 export default function ClientLayout({
   children,
@@ -17,9 +19,11 @@ export default function ClientLayout({
     pathname === '/privacy'
 
   return (
-    <div className="flex-1 flex flex-col">
-      {!isPublicPage && <Navbar />}
-      {children}
-    </div>
+    <AuthProvider>
+      <div className="flex-1 flex flex-col">
+        {!isPublicPage && <Navbar />}
+        {children}
+      </div>
+    </AuthProvider>
   )
 }

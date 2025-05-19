@@ -11,6 +11,7 @@ import {
   Dialog,
   DialogContent,
   DialogTitle,
+  DialogDescription,
   Command,
   CommandGroup,
   CommandInput,
@@ -130,6 +131,9 @@ export function SearchCommand({
         <DialogContent className="p-0 border-none bg-transparent shadow-none max-w-3xl w-full">
           <VisuallyHidden>
             <DialogTitle>Search</DialogTitle>
+            <DialogDescription>
+              Search for objects, properties, and values by UUID or keywords
+            </DialogDescription>
           </VisuallyHidden>
           <Command className="rounded-lg border shadow-md bg-white w-full">
             <div

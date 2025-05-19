@@ -1,22 +1,26 @@
 'use client'
 
 import {
-  useState,
-  useEffect,
-  PropsWithChildren,
   createContext,
   useContext,
+  PropsWithChildren,
+  useState,
+  useEffect,
 } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { createClient } from 'iob-client'
 import { API_CONFIG } from '@/lib/api-config'
 
-// Create a context for the IoB client
-type IobClientContextType = Awaited<ReturnType<typeof createClient>> | null
-const IobClientContext = createContext<IobClientContextType>(null)
+// Global singleton cache
+let cachedClientPromise: Promise<
+  Awaited<ReturnType<typeof createClient>>
+> | null = null
 
-// Hook to use the IoB client
+const IobClientContext = createContext<Awaited<
+  ReturnType<typeof createClient>
+> | null>(null)
+
 export function useIobClient() {
   const context = useContext(IobClientContext)
   if (!context) {
@@ -26,13 +30,12 @@ export function useIobClient() {
 }
 
 export function QueryProvider({ children }: PropsWithChildren) {
-  // Create React Query client
   const [queryClient] = useState(
     () =>
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: 60 * 1000, // 1 minute
+            staleTime: 60 * 1000,
             refetchOnWindowFocus: false,
             retry: 1,
           },
@@ -40,53 +43,60 @@ export function QueryProvider({ children }: PropsWithChildren) {
       })
   )
 
-  // State for IoB client
-  const [iobClient, setIobClient] = useState<IobClientContextType>(null)
-  const [loading, setLoading] = useState(true)
+  const [client, setClient] = useState<Awaited<
+    ReturnType<typeof createClient>
+  > | null>(null)
   const [error, setError] = useState<Error | null>(null)
 
-  // Initialize the IoB client
   useEffect(() => {
-    async function initClient() {
-      try {
-        const client = await createClient(API_CONFIG)
-        setIobClient(client)
-      } catch (err) {
-        console.error('Failed to initialize IoB client:', err)
-        setError(
-          err instanceof Error
-            ? err
-            : new Error('Failed to initialize IoB client')
-        )
-      } finally {
-        setLoading(false)
-      }
+    let isMounted = true
+
+    // Use cached promise or start new one
+    if (!cachedClientPromise) {
+      cachedClientPromise = createClient(API_CONFIG)
     }
 
-    initClient()
+    cachedClientPromise
+      .then((c) => {
+        if (isMounted) setClient(c)
+      })
+      .catch((err) => {
+        if (isMounted)
+          setError(
+            err instanceof Error ? err : new Error('Failed to init client')
+          )
+      })
+
+    return () => {
+      isMounted = false
+    }
   }, [])
 
-  // Show loading state
-  if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        Connecting to API...
-      </div>
-    )
-  }
-
-  // Show error state
-  if (error || !iobClient) {
+  if (error) {
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-4">
         <p className="text-xl font-bold text-red-500">API Connection Error</p>
-        <p>{error?.message || 'Failed to connect to the API'}</p>
+        <p>{error.message}</p>
+        <button
+          onClick={() => {
+            cachedClientPromise = null
+            window.location.reload()
+          }}
+          className="px-4 py-2 bg-primary text-white rounded-md"
+        >
+          Retry
+        </button>
       </div>
     )
   }
 
+  if (!client) {
+    // Optionally: Replace with Suspense fallback
+    return null // Or a subtle spinner
+  }
+
   return (
-    <IobClientContext.Provider value={iobClient}>
+    <IobClientContext.Provider value={client}>
       <QueryClientProvider client={queryClient}>
         {children}
         <ReactQueryDevtools initialIsOpen={false} />

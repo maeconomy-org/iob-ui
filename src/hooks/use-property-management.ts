@@ -26,32 +26,51 @@ export function usePropertyManagement(objectUuid?: string) {
   const [error, setError] = useState<Error | null>(null)
 
   /**
-   * Create a new property and add it to an object
+   * Create a new property for an object
    */
   const createPropertyForObject = useCallback(
-    async (
-      objectId: string,
-      propertyData: Partial<UUPropertyDTO> & { key: string }
-    ) => {
+    async (objectId: string, propertyData: any) => {
       setIsLoading(true)
       setError(null)
 
       try {
-        const result = await addPropertyMutation.mutateAsync({
+        // Extract values from property data if present
+        const values = propertyData.values || []
+        const propertyMetadata = { ...propertyData }
+        delete propertyMetadata.values
+
+        // Create the property first
+        const response = await addPropertyMutation.mutateAsync({
           objectUuid: objectId,
-          property: propertyData,
+          property: propertyMetadata,
         })
-        return result
+
+        // Get the property UUID from the response
+        // Based on API response structure in useAddPropertyToObject
+        const newProperty = response.property
+
+        // If we have a property UUID and values, add them
+        if (newProperty && newProperty.uuid && values.length > 0) {
+          for (const value of values) {
+            await setValueMutation.mutateAsync({
+              propertyUuid: newProperty.uuid,
+              value: {
+                value: value.value,
+              },
+            })
+          }
+        }
+
+        return newProperty
       } catch (err) {
-        setError(
-          err instanceof Error ? err : new Error('Failed to create property')
-        )
+        console.error('Error creating property:', err)
+        setError(err as Error)
         throw err
       } finally {
         setIsLoading(false)
       }
     },
-    [addPropertyMutation]
+    [addPropertyMutation, setValueMutation]
   )
 
   /**

@@ -88,3 +88,7 @@
     @apply bg-background text-foreground;
   }
 }
+
+.container {
+  @apply max-w-none md:max-w-[1500px];
+}

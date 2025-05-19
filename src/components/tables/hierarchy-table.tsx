@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { toast } from 'sonner'
 import {
   ChevronRight,
   ChevronDown,
@@ -9,6 +10,7 @@ import {
   Trash2,
   MoreHorizontal,
 } from 'lucide-react'
+
 import {
   Button,
   Badge,
@@ -26,7 +28,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  useToast,
+  DialogDescription,
 } from '@/components/ui'
 import EntityForm from '@/components/entity-form'
 
@@ -115,7 +117,6 @@ export function HierarchyTable() {
   })
   const [editEntity, setEditEntity] = useState<any>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const { toast } = useToast()
 
   const toggleRow = (id: number) => {
     setExpandedRows((prev) => ({
@@ -130,10 +131,7 @@ export function HierarchyTable() {
   }
 
   const handleDelete = (id: string) => {
-    toast({
-      title: 'Entity Deleted',
-      description: `Entity with ID: ${id} has been deleted`,
-    })
+    toast.success(`Entity with ID: ${id} has been deleted`)
     // Implement actual delete logic here
   }
 
@@ -241,6 +239,13 @@ export function HierarchyTable() {
                   ? 'Edit Entity'
                   : 'Entity Details'}
             </DialogTitle>
+            <DialogDescription>
+              {editEntity && editEntity.parentId
+                ? 'Add a new child entity to the selected parent.'
+                : editEntity
+                  ? 'Modify the properties of this entity.'
+                  : 'View and edit entity information.'}
+            </DialogDescription>
           </DialogHeader>
           <EntityForm
             entity={editEntity}
