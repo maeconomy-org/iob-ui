@@ -41,21 +41,46 @@ export function CollapsibleProperty({
     if (!isEditable || !onUpdate) return
 
     const updatedValues = [...(editedProperty.values || [])]
+
+    // Update the value
     updatedValues[valueIndex] = {
       ...updatedValues[valueIndex],
       value: newValue,
+      // If the user actually entered a value, remove the _needsInput flag
+      ...(newValue !== '' ? { _needsInput: false } : {}),
     }
 
-    // Mark property as modified when values change
-    handleChange('values', updatedValues)
+    // Create updated property with modified flag
+    const updated = {
+      ...editedProperty,
+      values: updatedValues,
+      _modified: true, // Always mark as modified when values change
+    }
+
+    setEditedProperty(updated)
+    onUpdate(updated)
   }
 
   // Add a new value
   const handleAddValue = () => {
     if (!isEditable || !onUpdate) return
 
-    const updatedValues = [...(editedProperty.values || []), { value: '' }]
-    handleChange('values', updatedValues)
+    // Create an empty array if values doesn't exist
+    const currentValues = editedProperty.values || []
+
+    // Create a new value with empty string, but mark it as _needsInput
+    // This will be used to indicate it's an empty placeholder that shouldn't be saved
+    const updatedValues = [...currentValues, { value: '', _needsInput: true }]
+
+    // Update the property with new values
+    const updated = {
+      ...editedProperty,
+      values: updatedValues,
+      _modified: true,
+    }
+
+    setEditedProperty(updated)
+    onUpdate(updated)
   }
 
   // Remove a value

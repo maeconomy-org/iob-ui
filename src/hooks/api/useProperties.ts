@@ -91,8 +91,30 @@ export function useProperties() {
         )
         return { objectUuid, property: response.data }
       },
-      onSuccess: ({ objectUuid }) => {
-        // Invalidate the object with properties
+      onSuccess: ({ objectUuid, property }) => {
+        // Update the object with properties cache directly
+        queryClient.setQueryData(
+          ['object', objectUuid, 'withProperties'],
+          (oldData: any) => {
+            if (!oldData) return oldData
+
+            // Add the new property to the object's properties
+            const updatedData = { ...oldData }
+            if (!updatedData.properties) {
+              updatedData.properties = []
+            }
+
+            // Add in the format expected by the object details sheet
+            updatedData.properties.push({
+              property: [property],
+              values: [],
+            })
+
+            return updatedData
+          }
+        )
+
+        // Also invalidate the queries that might need a refresh
         queryClient.invalidateQueries({
           queryKey: ['object', objectUuid, 'withProperties'],
         })
@@ -127,8 +149,40 @@ export function useProperties() {
         const response = await client.values.setForProperty(propertyUuid, value)
         return { propertyUuid, value: response.data }
       },
-      onSuccess: ({ propertyUuid }) => {
-        // Invalidate the property and any objects that might use this property
+      onSuccess: ({ propertyUuid, value }) => {
+        // Try to update object cache directly for the specific property
+        queryClient
+          .getQueryCache()
+          .findAll({ queryKey: ['object'] })
+          .forEach((query) => {
+            queryClient.setQueryData(query.queryKey, (oldData: any) => {
+              if (!oldData || !oldData.properties) return oldData
+
+              // Find the property group containing this property
+              const updatedData = { ...oldData }
+              const propertyGroup = updatedData.properties.find(
+                (group: any) =>
+                  group.property &&
+                  group.property.some((p: any) => p.uuid === propertyUuid)
+              )
+
+              if (propertyGroup) {
+                // Add the new value to the values array
+                if (!propertyGroup.values) {
+                  propertyGroup.values = []
+                }
+
+                // Add the value in the format expected by the object details
+                propertyGroup.values.push({
+                  value: [value],
+                })
+              }
+
+              return updatedData
+            })
+          })
+
+        // Invalidate the property and related queries
         queryClient.invalidateQueries({ queryKey: ['property', propertyUuid] })
         queryClient.invalidateQueries({ queryKey: ['object'] })
       },
@@ -145,6 +199,16 @@ export function useProperties() {
         property: UUPropertyDTO
         values?: Array<{ uuid?: string; value: string; valueTypeCast?: string }>
       }) => {
+        // First update the property metadata (like key)
+        if (property.uuid) {
+          // Note: The API uses the same endpoint for create and update
+          // When uuid is provided, it updates the existing property
+          await client.properties.api.create({
+            uuid: property.uuid,
+            key: property.key,
+          })
+        }
+
         // Then process each value
         for (const value of values) {
           if (value.uuid) {
@@ -168,12 +232,52 @@ export function useProperties() {
         return response.data
       },
       onSuccess: (updatedProperty) => {
-        // Invalidate all the caches that might be affected
-        if (updatedProperty) {
-          queryClient.invalidateQueries({
-            queryKey: ['property', updatedProperty.uuid],
+        if (!updatedProperty) return
+
+        // Try to update object caches directly with the updated property
+        queryClient
+          .getQueryCache()
+          .findAll({ queryKey: ['object'] })
+          .forEach((query) => {
+            queryClient.setQueryData(query.queryKey, (oldData: any) => {
+              if (!oldData || !oldData.properties) return oldData
+
+              const updatedData = { ...oldData }
+
+              // Find the property group containing this property
+              const propertyGroupIndex = updatedData.properties.findIndex(
+                (group: any) =>
+                  group.property &&
+                  group.property.some(
+                    (p: any) => p.uuid === updatedProperty.uuid
+                  )
+              )
+
+              if (propertyGroupIndex >= 0) {
+                // Update the property in the cache
+                const propertyGroup = updatedData.properties[propertyGroupIndex]
+                const propertyIndex = propertyGroup.property.findIndex(
+                  (p: any) => p.uuid === updatedProperty.uuid
+                )
+
+                if (propertyIndex >= 0) {
+                  // Update the property metadata
+                  propertyGroup.property[propertyIndex] = {
+                    ...propertyGroup.property[propertyIndex],
+                    key: updatedProperty.key,
+                    // Add other fields as needed
+                  }
+                }
+              }
+
+              return updatedData
+            })
           })
-        }
+
+        // Invalidate the caches to ensure eventual consistency
+        queryClient.invalidateQueries({
+          queryKey: ['property', updatedProperty.uuid],
+        })
         queryClient.invalidateQueries({ queryKey: ['propertyValue'] })
         queryClient.invalidateQueries({ queryKey: ['object'] })
       },

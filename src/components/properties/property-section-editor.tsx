@@ -34,7 +34,12 @@ export function PropertySectionEditor({
     const updated = [...editedProperties]
 
     // Compare with original property to check if it was modified
-    const originalProperty = properties[index]
+    const originalProperty =
+      properties.find(
+        (p) =>
+          p.uuid === updatedProperty.uuid ||
+          (p._tempId && p._tempId === updatedProperty._tempId)
+      ) || properties[index]
 
     // Check if the property is new - if so, don't compare with original
     if (!updatedProperty._isNew) {
@@ -75,6 +80,9 @@ export function PropertySectionEditor({
 
     if (existingIndex >= 0) {
       allUpdated[existingIndex] = updatedProperty
+    } else {
+      // If not found (shouldn't happen normally), add it
+      allUpdated.push(updatedProperty)
     }
 
     setAllProperties(allUpdated)
@@ -118,7 +126,7 @@ export function PropertySectionEditor({
     // Create a simpler property object with only key and values
     const newProperty = {
       key: `property_${editedProperties.length + 1}`,
-      values: [{ value: '' }],
+      values: [], // Create with empty values array instead of an empty string value
       _isNew: true,
       _tempId: tempId, // Use temporary ID for tracking
     }
@@ -136,9 +144,6 @@ export function PropertySectionEditor({
 
     // Expand the new property immediately
     setExpandedPropertyId(tempId)
-
-    // Show toast notification with Sonner
-    toast.success('New property added')
   }
 
   // Remove a property
