@@ -1,11 +1,5 @@
-import { useState } from 'react'
-import {
-  Control,
-  useFieldArray,
-  Controller,
-  useFormContext,
-} from 'react-hook-form'
-import { PlusIcon, XIcon, Upload, File } from 'lucide-react'
+import { Control, useFieldArray, useFormContext } from 'react-hook-form'
+import { PlusIcon, XIcon } from 'lucide-react'
 
 import { generateUUIDv7 } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -17,7 +11,6 @@ import {
   FormControl,
   FormMessage,
 } from '@/components/ui/form'
-import { Property, PropertyValue } from '@/lib/validations/object-model'
 
 interface PropertyFieldProps {
   control: Control<any>

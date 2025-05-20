@@ -30,7 +30,6 @@ import {
   ObjectFormValues,
   Property,
 } from '@/lib/validations/object-model'
-import { useObjects } from '@/hooks'
 
 interface ObjectAddSheetProps {
   isOpen: boolean
@@ -53,7 +52,6 @@ export function ObjectAddSheet({
   const form = useForm<ObjectFormValues>({
     resolver: zodResolver(objectSchema),
     defaultValues: {
-      uuid: '',
       name: '',
       abbreviation: '',
       version: '',
@@ -70,20 +68,10 @@ export function ObjectAddSheet({
     name: 'properties',
   })
 
-  const {
-    fields: fileFields,
-    append: appendFile,
-    remove: removeFile,
-  } = useFieldArray({
-    control: form.control,
-    name: 'files',
-  })
-
   // Reset form when sheet opens
   useEffect(() => {
     if (isOpen) {
       form.reset({
-        uuid: '',
         name: '',
         abbreviation: '',
         version: '',
@@ -272,7 +260,7 @@ export function ObjectAddSheet({
                 <div className="space-y-4">
                   {fields.map((field, index) => (
                     <PropertyField
-                      key={field.uuid}
+                      key={field.uuid !== '' ? field.uuid : index}
                       control={form.control}
                       name={`properties.${index}`}
                       index={index}

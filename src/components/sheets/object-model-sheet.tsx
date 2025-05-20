@@ -225,7 +225,7 @@ export function ObjectModelSheet({
 
               {fields.map((field, index) => (
                 <PropertyField
-                  key={field.uuid}
+                  key={field.uuid !== '' ? field.uuid : index}
                   control={form.control}
                   name={`properties.${index}`}
                   index={index}

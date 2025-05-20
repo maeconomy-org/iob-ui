@@ -12,6 +12,7 @@ interface EditableSectionProps {
   renderEdit: () => ReactNode
   onSave?: () => Promise<void> | void
   successMessage?: string
+  showToast?: boolean
 }
 
 export function EditableSection({
@@ -22,6 +23,7 @@ export function EditableSection({
   renderEdit,
   onSave,
   successMessage = 'Changes saved successfully',
+  showToast = true,
 }: EditableSectionProps) {
   const [isSaving, setIsSaving] = useState(false)
 
@@ -36,12 +38,14 @@ export function EditableSection({
       await onSave()
       onEditToggle(false)
 
-      // Show a success toast with Sonner
-      toast.success(successMessage)
+      // Show a success toast with Sonner only if showToast is true
+      if (showToast) {
+        toast.success(successMessage)
+      }
     } catch (error) {
       console.error('Error saving section:', error)
 
-      // Show an error toast with Sonner
+      // Always show error toasts
       toast.error('Failed to save changes. Please try again.')
     } finally {
       setIsSaving(false)

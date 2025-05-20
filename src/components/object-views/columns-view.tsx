@@ -86,17 +86,6 @@ function ObjectColumn({
 }) {
   // Get icon based on object type
   const getIcon = (item: ObjectItem) => {
-    const name = item.name?.toLowerCase() || ''
-
-    if (name.includes('building') || name.includes('house'))
-      return <Building2 size={16} />
-    if (name.includes('floor')) return <Layers size={16} />
-    if (name.includes('room')) return <Package size={16} />
-    if (name.includes('wall')) return <Layers size={16} />
-    if (name.includes('door')) return <DoorClosed size={16} />
-    if (name.includes('window')) return <Wind size={16} />
-    if (name.includes('kitchen')) return <Package size={16} />
-
     return <FileText size={16} />
   }
 
@@ -179,42 +168,6 @@ function ObjectColumn({
           })}
         </div>
       </ScrollArea>
-    </div>
-  )
-}
-
-// Path breadcrumb component
-function PathBreadcrumb({
-  path,
-  onNavigate,
-}: {
-  path: ObjectItem[]
-  onNavigate: (index: number) => void
-}) {
-  return (
-    <div className="flex items-center space-x-1 overflow-x-auto p-1 text-sm">
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-7 shrink-0"
-        onClick={() => onNavigate(-1)}
-      >
-        Root
-      </Button>
-
-      {path.map((item, index) => (
-        <div key={item.uuid} className="flex items-center shrink-0">
-          <ChevronRight className="h-4 w-4 text-muted-foreground mx-1" />
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7"
-            onClick={() => onNavigate(index)}
-          >
-            {item.name}
-          </Button>
-        </div>
-      ))}
     </div>
   )
 }

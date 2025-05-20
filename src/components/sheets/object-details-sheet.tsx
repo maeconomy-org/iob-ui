@@ -97,26 +97,47 @@ export function ObjectDetailsSheet({
     // All other objects (for history)
     const history = sortedObjects.slice(1)
 
-    // Process properties to correct format
+    // Process properties to correct format - filter out soft-deleted ones
     const processedProperties =
-      fullObjectData.properties?.map((propGroup: any) => {
-        // Extract property metadata from the first property item
-        const propMeta = propGroup.property?.[0] || {}
+      fullObjectData.properties
+        ?.map((propGroup: any) => {
+          // Extract property metadata from the first property item that's not soft-deleted
+          const propItems = propGroup.property || []
+          const validPropItems = propItems.filter(
+            (item: any) => !item.softDeleted
+          )
+          const propMeta =
+            validPropItems.length > 0 ? validPropItems[0] : propItems[0] || {}
 
-        // Extract and combine all values
-        const values =
-          propGroup.values?.flatMap(
-            (valueObj: any) => valueObj.value?.map((val: any) => val) || []
-          ) || []
+          // Extract and combine all values that are not soft-deleted
+          const values =
+            propGroup.values?.flatMap((valueObj: any) => {
+              // Filter out soft-deleted value objects
+              if (valueObj.softDeleted) return []
+              // Get non-soft-deleted values from each value object
+              return (
+                valueObj.value
+                  ?.filter((val: any) => !val.softDeleted)
+                  .map((val: any) => val) || []
+              )
+            }) || []
 
-        return {
-          ...propMeta,
-          values,
-        }
-      }) || []
+          // Skip entirely soft-deleted properties
+          if (propMeta.softDeleted) {
+            return null
+          }
 
-    // Process files
-    const processedFiles = fullObjectData.files || []
+          return {
+            ...propMeta,
+            values,
+          }
+        })
+        .filter(Boolean) || []
+
+    // Process files - filter out soft-deleted ones
+    const processedFiles = (fullObjectData.files || []).filter(
+      (file: any) => !file.softDeleted
+    )
 
     return {
       object: latestObject,
@@ -196,26 +217,33 @@ export function ObjectDetailsSheet({
         return
       }
 
-      // Show loading toast
-      toast.promise(
-        updateObjectMetadataMutation.mutateAsync({
+      // Show a single toast for the operation
+      const toastId = 'update-metadata-' + Date.now()
+      toast.loading('Updating object metadata...', { id: toastId })
+
+      try {
+        // Call the API to update metadata
+        await updateObjectMetadataMutation.mutateAsync({
           uuid: object.uuid,
           name: editedObject.name,
           abbreviation: editedObject.abbreviation,
           version: editedObject.version,
           description: editedObject.description,
-        }),
-        {
-          loading: 'Updating object metadata...',
-          success: 'Object metadata updated successfully',
-          error: 'Failed to update object metadata',
-        }
-      )
+        })
 
-      setActiveEditingSection(null)
+        // Show success toast
+        toast.success('Object metadata updated successfully', { id: toastId })
+
+        // Exit edit mode
+        setActiveEditingSection(null)
+      } catch (error) {
+        // Show error toast
+        toast.error('Failed to update object metadata', { id: toastId })
+        console.error('Error saving metadata:', error)
+      }
     } catch (error) {
-      console.error('Error saving metadata:', error)
-      toast.error('Failed to update object metadata')
+      console.error('Error in metadata update process:', error)
+      toast.error('Failed to process metadata updates')
     }
   }
 
@@ -224,55 +252,111 @@ export function ObjectDetailsSheet({
     if (!editedProperties || !object) return
 
     try {
-      // Check if any properties have been modified, added or deleted
-      const hasChanges = editedProperties.some(
-        (prop) => prop._isNew || prop._deleted || prop._modified
-      )
+      // Create an array of properties that need to be updated
+      const propertiesToUpdate = editedProperties.filter((prop) => {
+        // Check if the property has been flagged as modified, deleted, or is new
+        if (prop._isNew || prop._deleted || prop._modified) {
+          return true
+        }
 
-      if (!hasChanges) {
-        // No changes, just close the editing mode
+        // Additional check: compare with original properties
+        const originalProp = properties.find((p) => p.uuid === prop.uuid)
+        if (!originalProp) return false
+
+        // Check if key has changed
+        if (prop.key !== originalProp.key) return true
+
+        // Check if values have changed
+        if (prop.values?.length !== originalProp.values?.length) return true
+
+        // Check if any value content has changed
+        const valuesChanged = prop.values?.some((val: any, i: number) => {
+          const origVal = originalProp.values?.[i]
+          return !origVal || val.value !== origVal.value
+        })
+
+        return valuesChanged
+      })
+
+      // If no changes, just close the editing mode
+      if (propertiesToUpdate.length === 0) {
         setActiveEditingSection(null)
         return
       }
 
-      // Show loading toast
-      toast.promise(
-        async () => {
-          // Process each property
-          for (const property of editedProperties) {
-            if (property._deleted) {
-              // Delete property if marked for deletion
-              await removePropertyFromObject(object.uuid, property.uuid)
-            } else if (property._isNew) {
-              // Create new property with only key and values
-              await createPropertyForObject(object.uuid, {
+      // Show a single toast for the entire operation
+      let toastId = 'update-properties-' + Date.now()
+      toast.loading('Updating object properties...', { id: toastId })
+
+      try {
+        // Create an array to track all API operations
+        const operations = []
+
+        // Process each property that needs updating
+        for (const property of propertiesToUpdate) {
+          if (property._deleted) {
+            // Delete property if marked for deletion
+            operations.push(
+              removePropertyFromObject(object.uuid, property.uuid)
+            )
+          } else if (property._isNew) {
+            // Create new property with only key and values
+            // Filter out any empty values
+            const nonEmptyValues = (property.values || []).filter(
+              (val: any) =>
+                // Skip empty values
+                val.value !== undefined &&
+                val.value !== '' &&
+                // Skip values marked as needing input (from the collapsible-property component)
+                val._needsInput !== true
+            )
+
+            operations.push(
+              createPropertyForObject(object.uuid, {
                 key: property.key,
-                values: property.values || [],
+                values: nonEmptyValues,
               })
-            } else if (property._modified) {
-              // Only update existing property if it was modified
-              // Just use the key field and values
-              await updatePropertyWithValues(
+            )
+          } else {
+            // Update existing property - don't rely on _modified flag exclusively
+            // Filter out any empty values
+            const nonEmptyValues = (property.values || []).filter(
+              (val: any) =>
+                // Skip empty values
+                val.value !== undefined &&
+                val.value !== '' &&
+                // Skip values marked as needing input (from the collapsible-property component)
+                val._needsInput !== true
+            )
+
+            operations.push(
+              updatePropertyWithValues(
                 {
                   uuid: property.uuid,
-                  key: property.key,
+                  key: property.key, // This will update the key/name
                 },
-                property.values || []
+                nonEmptyValues // Only include non-empty values
               )
-            }
+            )
           }
-        },
-        {
-          loading: 'Updating object properties...',
-          success: 'Object properties updated successfully',
-          error: 'Failed to update object properties',
         }
-      )
 
-      setActiveEditingSection(null)
+        // Wait for all operations to complete
+        await Promise.all(operations)
+
+        // Show success toast
+        toast.success('Object properties updated successfully', { id: toastId })
+
+        // Exit edit mode
+        setActiveEditingSection(null)
+      } catch (error) {
+        // Show error toast
+        toast.error('Failed to update object properties', { id: toastId })
+        console.error('Error saving properties:', error)
+      }
     } catch (error) {
-      console.error('Error saving properties:', error)
-      toast.error('Failed to update object properties')
+      console.error('Error in property update process:', error)
+      toast.error('Failed to process property updates')
     }
   }
 
@@ -342,6 +426,7 @@ export function ObjectDetailsSheet({
                 }
                 onSave={handleSaveMetadata}
                 successMessage="Object metadata updated successfully"
+                showToast={false}
                 renderDisplay={() => (
                   <div className="grid grid-cols-1 gap-3">
                     <div>
@@ -504,6 +589,7 @@ export function ObjectDetailsSheet({
                 }
                 onSave={handleSaveProperties}
                 successMessage="Object properties updated successfully"
+                showToast={false}
                 renderDisplay={() => (
                   <div>
                     {properties && properties.length > 0 ? (
