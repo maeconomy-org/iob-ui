@@ -14,13 +14,15 @@ import { AUTH_SESSION_KEY } from '@/constants'
 interface AuthData {
   authenticated: boolean
   timestamp: number
-  username?: string
+  certCommonName?: string
+  certFingerprint?: string
 }
 
 // Auth context type
 interface AuthContextType {
   isAuthenticated: boolean
-  username: string | undefined
+  certCommonName: string | undefined
+  certFingerprint: string | undefined
   login: (authData: AuthData) => void
   logout: () => void
   checkAuth: () => boolean
@@ -29,7 +31,8 @@ interface AuthContextType {
 // Default auth context
 const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
-  username: undefined,
+  certCommonName: undefined,
+  certFingerprint: undefined,
   login: () => {},
   logout: () => {},
   checkAuth: () => false,
@@ -44,7 +47,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const router = useRouter()
   const pathname = usePathname()
   const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [username, setUsername] = useState<string | undefined>(undefined)
+  const [certCommonName, setCertCommonName] = useState<string | undefined>(
+    undefined
+  )
+  const [certFingerprint, setCertFingerprint] = useState<string | undefined>(
+    undefined
+  )
 
   // Public pages that don't require authentication
   const publicPages = ['/', '/help', '/terms', '/privacy']
@@ -69,10 +77,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (parsed.authenticated && parsed.timestamp) {
           const authTime = new Date(parsed.timestamp)
           const now = new Date()
-          // If authenticated within the last hour, consider it valid
-          if (now.getTime() - authTime.getTime() < 60 * 60 * 1000) {
+          // If authenticated within the 12 hours, consider it valid
+          if (now.getTime() - authTime.getTime() < 12 * 60 * 60 * 1000) {
             setIsAuthenticated(true)
-            setUsername(parsed.username)
+            setCertCommonName(parsed.certCommonName)
+            setCertFingerprint(parsed.certFingerprint)
             return true
           }
         }
@@ -82,7 +91,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     setIsAuthenticated(false)
-    setUsername(undefined)
+    setCertCommonName(undefined)
+    setCertFingerprint(undefined)
     return false
   }
 
@@ -91,14 +101,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Store auth data in session storage
     sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(authData))
     setIsAuthenticated(true)
-    setUsername(authData.username)
+    setCertCommonName(authData.certCommonName)
+    setCertFingerprint(authData.certFingerprint)
   }
 
   // Logout function
   const logout = () => {
     sessionStorage.removeItem(AUTH_SESSION_KEY)
     setIsAuthenticated(false)
-    setUsername(undefined)
+    setCertCommonName(undefined)
+    setCertFingerprint(undefined)
     router.push('/')
   }
 
@@ -106,7 +118,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     <AuthContext.Provider
       value={{
         isAuthenticated,
-        username,
+        certCommonName,
+        certFingerprint,
         login,
         logout,
         checkAuth,

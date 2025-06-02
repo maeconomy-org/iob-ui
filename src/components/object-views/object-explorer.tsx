@@ -6,10 +6,8 @@ import { useObjects } from '@/hooks'
 import { DeleteConfirmationDialog } from '@/components/modals'
 import { filterObjectsBySearchTerm } from '@/lib/explorer-view-utils'
 
-import { SearchBar } from './explorer-view/search-bar'
-import { TreeItem } from './explorer-view/tree-item'
-import { DetailsPanel } from './explorer-view/details-panel'
-import type { ObjectItem } from './explorer-view/tree-item'
+import { SearchBar, TreeItem, DetailsPanel } from './explorer-view'
+import type { ObjectItem } from './explorer-view'
 
 interface ObjectExplorerProps {
   data: ObjectItem[]
@@ -17,9 +15,21 @@ interface ObjectExplorerProps {
   onViewObject?: (object: any) => void
   onEditObject?: (object: any) => void
   onSaveObject?: (object: any) => void
+  pagination?: {
+    currentPage: number
+    totalPages: number
+    totalElements: number
+    pageSize: number
+    isFirstPage: boolean
+    isLastPage: boolean
+  }
 }
 
-export function ObjectExplorer({ data, availableModels }: ObjectExplorerProps) {
+export function ObjectExplorer({
+  data,
+  availableModels,
+  pagination,
+}: ObjectExplorerProps) {
   // State management
   const [expandedItems, setExpandedItems] = useState<string[]>([])
   const [selectedItem, setSelectedItem] = useState<ObjectItem | null>(null)
@@ -86,7 +96,14 @@ export function ObjectExplorer({ data, availableModels }: ObjectExplorerProps) {
           </div>
 
           <div className="p-2 border-t bg-muted/50 text-xs text-muted-foreground">
-            {filteredObjects.length} root objects
+            {pagination ? (
+              <>
+                Page {pagination.currentPage} of {pagination.totalPages}(
+                {filteredObjects.length} of {pagination.totalElements} objects)
+              </>
+            ) : (
+              `${filteredObjects.length} root objects`
+            )}
           </div>
         </div>
 

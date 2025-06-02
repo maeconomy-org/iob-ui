@@ -9,22 +9,25 @@ import {
   UserCircle,
   LogOut,
   Menu,
-  X,
   ChevronRight,
+  ChevronDown,
 } from 'lucide-react'
 
 import {
   Button,
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
   SheetClose,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  CopyButton,
 } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { APP_ACRONYM, NAV_ITEMS } from '@/constants'
@@ -35,7 +38,15 @@ export default function Navbar() {
   const pathname = usePathname()
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const { username, logout } = useAuth()
+  const { certCommonName, certFingerprint, logout } = useAuth()
+
+  // Function to format fingerprint for display (truncate)
+  const formatFingerprint = (fingerprint: string) => {
+    if (!fingerprint) return ''
+    return fingerprint.length > 24
+      ? `${fingerprint.slice(0, 24)}...`
+      : fingerprint
+  }
 
   return (
     <header className="border-b bg-white top-0 z-10">
@@ -87,34 +98,65 @@ export default function Navbar() {
               </kbd>
             </Button>
 
-            {/* User Profile - Hidden on Mobile */}
-            <div className="hidden md:flex items-center gap-2 ml-2">
-              <div className="flex items-center gap-2 p-2 rounded-md border">
-                <UserCircle className="h-5 w-5 text-gray-500" />
-                <span className="text-sm font-medium">
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="cursor-pointer">
-                          {username?.substring(0, 8) +
-                            '...' +
-                            username?.substring(username.length - 8)}
+            {/* User Profile Dropdown - Hidden on Mobile */}
+            <div className="hidden md:flex">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="flex items-center gap-2 px-3"
+                  >
+                    <UserCircle className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm font-medium max-w-32 truncate">
+                      {certCommonName || 'User'}
+                    </span>
+                    <ChevronDown className="h-3 w-3 text-gray-500" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-80">
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col space-y-2">
+                      <p className="text-sm font-medium leading-none">
+                        {certCommonName || 'User'}
+                      </p>
+                      <p className="text-xs leading-none text-muted-foreground">
+                        Certificate Authentication
+                      </p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+
+                  {/* Certificate Fingerprint */}
+                  {certFingerprint && (
+                    <DropdownMenuItem
+                      className="flex flex-col items-start p-3"
+                      onSelect={(e) => e.preventDefault()}
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <span className="text-xs font-medium text-muted-foreground">
+                          Certificate Fingerprint
                         </span>
-                      </TooltipTrigger>
-                      <TooltipContent>{username}</TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </span>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={logout}
-                title="Logout"
-                className="hover:bg-red-50 hover:text-red-500"
-              >
-                <LogOut className="h-5 w-5" />
-              </Button>
+                        <CopyButton
+                          text={certFingerprint}
+                          className="h-6 w-6 p-0"
+                        />
+                      </div>
+                      <code className="text-xs rounded w-full block truncate">
+                        {formatFingerprint(certFingerprint)}
+                      </code>
+                    </DropdownMenuItem>
+                  )}
+
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={logout}
+                    className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
+                  >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
 
             {/* Mobile Menu Trigger */}
@@ -140,22 +182,33 @@ export default function Navbar() {
                   <div className="px-4 mb-4">
                     <div className="flex items-center gap-2 p-3 rounded-md border">
                       <UserCircle className="h-5 w-5 text-gray-500" />
-                      <div className="flex flex-col">
+                      <div className="flex flex-col flex-1">
                         <span className="text-sm font-medium">
-                          {username ? (
-                            <>
-                              {username.substring(0, 6)}...
-                              {username.substring(username.length - 6)}
-                            </>
-                          ) : (
-                            'User'
-                          )}
+                          {certCommonName || 'User'}
                         </span>
                         <span className="text-xs text-muted-foreground">
-                          Signed in
+                          Certificate Authentication
                         </span>
                       </div>
                     </div>
+
+                    {/* Mobile Certificate Fingerprint */}
+                    {certFingerprint && (
+                      <div className="mt-3 p-3 rounded-md border">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-medium text-muted-foreground">
+                            Certificate Fingerprint
+                          </span>
+                          <CopyButton
+                            text={certFingerprint}
+                            className="h-6 w-6 p-0"
+                          />
+                        </div>
+                        <code className="text-xs bg-muted px-2 py-1 rounded block break-all">
+                          {certFingerprint}
+                        </code>
+                      </div>
+                    )}
                   </div>
                   <nav className="flex flex-col">
                     {NAV_ITEMS.map((item) => (

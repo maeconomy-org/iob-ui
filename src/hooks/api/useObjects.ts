@@ -1,134 +1,68 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useIobClient } from '@/providers/query-provider'
 import type {
   UUObjectDTO,
   ComplexObjectCreationInput,
   ComplexObjectOutput,
   UUID,
-  UUObjectWithProperties,
+  QueryParams,
 } from 'iob-client'
-import type { QueryOptions, ObjectUpdateInput } from '@/types'
+import { useIobClient } from '@/providers/query-provider'
 
 export function useObjects() {
   const client = useIobClient()
   const queryClient = useQueryClient()
 
-  // Get all objects
-  const useAllObjects = (options?: QueryOptions) => {
+  // Get all objects using the new unified API
+  const useAllObjects = (options?: QueryParams & { enabled?: boolean }) => {
+    const { enabled = true, ...queryParams } = options || {}
     return useQuery({
-      queryKey: ['objects'],
+      queryKey: ['objects', queryParams],
       queryFn: async () => {
-        const response = await client.objects.api.getOwn()
+        const response = await client.objects.getObjects({
+          softDeleted: false,
+          ...queryParams,
+        })
         return response.data
       },
-      ...options,
+      enabled,
     })
   }
 
-  // Get objects by type
-  const useObjectsByType = (type: string, options?: QueryOptions) => {
-    return useQuery({
-      queryKey: ['objects', 'type', type],
-      queryFn: async () => {
-        const response = await client.objects.api.getByType(type)
-        return response.data
-      },
-      ...options,
-    })
-  }
-
-  // Get object by ID with properties
-  const useObjectWithProperties = (uuid: string, options?: QueryOptions) => {
-    return useQuery({
-      queryKey: ['object', uuid, 'withProperties'],
-      queryFn: async () => {
-        if (!uuid) return null
-        const response = await client.objects.getWithProperties(uuid)
-        return response.data
-      },
-      enabled: !!uuid,
-      ...options,
-    })
-  }
-
-  // Get full object with all details (properties, values, files)
-  const useFullObject = (uuid: string, options?: QueryOptions) => {
-    return useQuery({
-      queryKey: ['object', uuid, 'full'],
-      queryFn: async () => {
-        if (!uuid) return null
-        const response = await client.objects.getFullObject(uuid)
-        return response.data
-      },
-      enabled: !!uuid,
-      ...options,
-    })
-  }
-
-  // Get object by ID (basic info)
-  const useObject = (uuid: string, options?: QueryOptions) => {
+  // Get objects by specific UUID (returns array but should contain single object)
+  const useObject = (uuid: string, options?: { enabled?: boolean }) => {
     return useQuery({
       queryKey: ['object', uuid],
       queryFn: async () => {
         if (!uuid) return null
-        const response = await client.objects.api.getById(uuid)
-        return response.data
+        const response = await client.objects.getObjects({ uuid })
+        // Since API returns array, get the first object
+        return response.data?.[0] || null
       },
-      enabled: !!uuid,
-      ...options,
+      enabled: !!uuid && options?.enabled !== false,
     })
   }
 
-  // Create object mutation
+  // Create object mutation - using new simplified method
   const useCreateObject = () => {
     return useMutation({
       mutationFn: async (object: UUObjectDTO) => {
-        console.log('object', object)
-        const response = await client.objects.api.create(object)
-        console.log('response', response)
+        const response = await client.objects.create(object)
         return response.data
       },
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ['objects'] })
+
+        // Also invalidate aggregate queries to refresh table/explorer views
+        queryClient.invalidateQueries({ queryKey: ['aggregates'] })
       },
     })
   }
 
-  // Create object with properties mutation
-  const useCreateObjectWithProperties = () => {
-    return useMutation({
-      mutationFn: async ({
-        object,
-        properties,
-      }: {
-        object: Omit<UUObjectDTO, 'uuid'>
-        properties: Array<{
-          property: {
-            key: string
-            label?: string
-            description?: string
-            type?: string
-          }
-          value?: { value: string; valueTypeCast?: string }
-        }>
-      }) => {
-        const response = await client.objects.createWithProperties(
-          object,
-          properties
-        )
-        return response.data
-      },
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ['objects'] })
-      },
-    })
-  }
-
-  // Create full object mutation (renamed from createComplex to createFullObject)
+  // Create full object mutation - keep high-level method
   const useCreateFullObject = () => {
     return useMutation({
       mutationFn: async (objectData: ComplexObjectCreationInput) => {
-        console.log('objectData', objectData)
+        console.log('Creating full object:', objectData)
         const response = await client.objects.createFullObject(objectData)
         return response.data
       },
@@ -136,12 +70,18 @@ export function useObjects() {
         // Invalidate relevant queries
         queryClient.invalidateQueries({ queryKey: ['objects'] })
 
+        // Also invalidate aggregate queries to refresh table/explorer views
+        queryClient.invalidateQueries({ queryKey: ['aggregates'] })
+
         if (data?.object?.uuid) {
           queryClient.invalidateQueries({
             queryKey: ['object', data.object.uuid],
           })
           queryClient.invalidateQueries({
             queryKey: ['object', data.object.uuid, 'withProperties'],
+          })
+          queryClient.invalidateQueries({
+            queryKey: ['aggregate', data.object.uuid],
           })
         }
 
@@ -153,50 +93,15 @@ export function useObjects() {
           queryClient.invalidateQueries({
             queryKey: ['object', data.parent.uuid, 'children'],
           })
+          queryClient.invalidateQueries({
+            queryKey: ['aggregate', data.parent.uuid],
+          })
         }
       },
     })
   }
 
-  // Update object mutation
-  const useUpdateObject = () => {
-    return useMutation({
-      mutationFn: async ({
-        uuid,
-        updates,
-      }: {
-        uuid: UUID
-        updates: ObjectUpdateInput
-      }) => {
-        const response = await client.objects.updateObject(uuid, updates)
-        return response.data
-      },
-      onSuccess: (data: UUObjectWithProperties | null) => {
-        // Invalidate relevant queries
-        queryClient.invalidateQueries({ queryKey: ['objects'] })
-
-        if (data?.object?.uuid) {
-          queryClient.invalidateQueries({
-            queryKey: ['object', data.object.uuid],
-          })
-          queryClient.invalidateQueries({
-            queryKey: ['object', data.object.uuid, 'withProperties'],
-          })
-          queryClient.invalidateQueries({
-            queryKey: ['object', data.object.uuid, 'full'],
-          })
-        }
-
-        // For parent relationships, we'll need to check statements
-        // But we can also invalidate any children queries since the structure may have changed
-        queryClient.invalidateQueries({
-          queryKey: ['objects', 'children'],
-        })
-      },
-    })
-  }
-
-  // Update object metadata only
+  // Update object metadata only - using create method (which handles updates)
   const useUpdateObjectMetadata = () => {
     return useMutation({
       mutationFn: async ({
@@ -212,8 +117,8 @@ export function useObjects() {
         version?: string
         description?: string
       }) => {
-        // Only update the object's metadata fields via the standard API
-        const response = await client.objects.api.create({
+        // Use the create method which handles both create and update
+        const response = await client.objects.create({
           uuid,
           name,
           abbreviation,
@@ -234,63 +139,40 @@ export function useObjects() {
           queryClient.invalidateQueries({
             queryKey: ['object', data.uuid, 'full'],
           })
+
+          // Also invalidate aggregate queries to refresh table/explorer views
+          queryClient.invalidateQueries({ queryKey: ['aggregates'] })
+          queryClient.invalidateQueries({ queryKey: ['aggregate', data.uuid] })
         }
       },
     })
   }
 
-  // Delete object mutation (performs soft delete)
+  // Delete object mutation - using new simplified method
   const useDeleteObject = () => {
     return useMutation({
       mutationFn: async (uuid: string) => {
-        console.log('uuid', uuid)
-        const response = await client.objects.api.delete(uuid)
-        console.log('response', response)
-        return uuid
+        const response = await client.objects.delete(uuid)
+        return response.data
       },
       onSuccess: (deletedUuid) => {
         queryClient.invalidateQueries({ queryKey: ['objects'] })
         // Don't remove queries since soft delete keeps the object
         queryClient.invalidateQueries({ queryKey: ['object', deletedUuid] })
-      },
-    })
-  }
 
-  // Add child to parent object
-  const useAddChildToObject = () => {
-    return useMutation({
-      mutationFn: async ({
-        parentUuid,
-        childUuid,
-      }: {
-        parentUuid: string
-        childUuid: string
-      }) => {
-        const response = await client.objects.addChild(parentUuid, childUuid)
-        return { parentUuid, childUuid, success: response.data }
-      },
-      onSuccess: ({ parentUuid }) => {
-        // Invalidate the parent object and the parent's children
-        queryClient.invalidateQueries({ queryKey: ['object', parentUuid] })
-        queryClient.invalidateQueries({
-          queryKey: ['object', parentUuid, 'children'],
-        })
+        // Also invalidate aggregate queries to refresh table/explorer views
+        queryClient.invalidateQueries({ queryKey: ['aggregates'] })
+        queryClient.invalidateQueries({ queryKey: ['aggregate', deletedUuid] })
       },
     })
   }
 
   return {
     useAllObjects,
-    useObjectsByType,
-    useObjectWithProperties,
-    useFullObject,
     useObject,
     useCreateObject,
-    useCreateObjectWithProperties,
     useCreateFullObject,
-    useUpdateObject,
     useUpdateObjectMetadata,
     useDeleteObject,
-    useAddChildToObject,
   }
 }

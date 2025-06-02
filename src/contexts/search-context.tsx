@@ -109,24 +109,18 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
     const trimmedQuery = query.trim().toLowerCase()
 
     try {
-      const result = await searchMutation.mutateAsync(trimmedQuery)
-
-      if (result) {
+      const results = await searchMutation.mutateAsync(trimmedQuery)
+      if (results && results.length > 0) {
+        const result = results[0]
         // Transform the result into our SearchResult format
         const searchResult: SearchResult = {
           id: result.uuid || result.id || trimmedQuery,
-          type:
-            result.type ||
-            (result.key && 'property') ||
-            (result.value && 'value') ||
-            'object',
-          name: result.name || result.key || result.value || 'Unknown Item',
-          path: result.path,
-          metadata: result.metadata,
+          type: 'object',
+          name: result.name || 'Unknown Item',
         }
 
         setSearchResults([searchResult])
-        addToRecentSearches(query)
+        // addToRecentSearches(query)
       } else {
         setSearchResults([])
       }

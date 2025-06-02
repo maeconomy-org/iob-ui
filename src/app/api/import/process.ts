@@ -1,3 +1,4 @@
+import { API_CONFIG } from '@/lib/api-config'
 import redis from '@/lib/redis'
 
 export async function processImportJob(jobId: string) {
@@ -50,17 +51,15 @@ export async function processImportJob(jobId: string) {
 
       try {
         // Send to Java backend API
-        // const response = await fetch(
-        //   process.env.JAVA_API_URL || 'http://localhost:8080/api/objects',
-        //   {
-        //     method: 'POST',
-        //     headers: {
-        //       'Content-Type': 'application/json',
-        //       Authorization: `Bearer ${process.env.API_TOKEN || ''}`, // Add auth if needed
-        //     },
-        //     body: JSON.stringify(object),
-        //   }
-        // )
+        // const response = await fetch(`${API_CONFIG.baseUrl}/api/Import`, {
+        //   method: 'POST',
+        //   headers: {
+        //     'Content-Type': 'application/json',
+        //   },
+        //   body: JSON.stringify(object),
+        // })
+
+        // console.log(response)
 
         // if (!response.ok) {
         //   throw new Error(`API responded with status ${response.status}`)

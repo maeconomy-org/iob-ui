@@ -64,17 +64,6 @@ export function TreeItem({
 
   // Get icon based on object type
   const getIcon = () => {
-    const name = item.name?.toLowerCase() || ''
-
-    if (name.includes('building') || name.includes('house'))
-      return <Package size={16} />
-    if (name.includes('floor')) return <Folder size={16} />
-    if (name.includes('room')) return <Package size={16} />
-    if (name.includes('wall')) return <Folder size={16} />
-    if (name.includes('door')) return <FolderOpen size={16} />
-    if (name.includes('window')) return <Folder size={16} />
-    if (name.includes('kitchen')) return <Package size={16} />
-
     return <FileText size={16} />
   }
 
@@ -101,21 +90,6 @@ export function TreeItem({
           style={{ marginLeft: `${indent}px` }}
           className="flex items-center flex-1"
         >
-          {hasChildren ? (
-            <button
-              onClick={toggleExpand}
-              className="mr-1 h-5 w-5 hover:bg-muted rounded-sm flex items-center justify-center"
-            >
-              {isExpanded ? (
-                <ChevronDown className="h-3.5 w-3.5" />
-              ) : (
-                <ChevronRight className="h-3.5 w-3.5" />
-              )}
-            </button>
-          ) : (
-            <div className="w-5" />
-          )}
-
           <div className="rounded-full w-5 h-5 flex items-center justify-center bg-blue-50 text-blue-600 mr-2">
             {getIcon()}
           </div>
@@ -138,7 +112,7 @@ export function TreeItem({
         </div>
       </div>
 
-      {isExpanded && hasChildren && (
+      {/* {isExpanded && hasChildren && (
         <div>
           {item.children?.map((child) => (
             <TreeItem
@@ -153,7 +127,7 @@ export function TreeItem({
             />
           ))}
         </div>
-      )}
+      )} */}
     </>
   )
 }

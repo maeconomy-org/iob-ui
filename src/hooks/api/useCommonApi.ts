@@ -11,8 +11,8 @@ export function useCommonApi() {
         base: any
         uuid: any
       }> => {
-        const baseAuthResponse = await client.common.requestBaseAuth()
-        const uuidAuthResponse = await client.common.requestUuidAuth()
+        const baseAuthResponse = await client.auth.requestBaseAuth()
+        const uuidAuthResponse = await client.auth.requestUuidAuth()
 
         return {
           base: { ...baseAuthResponse },
@@ -26,7 +26,7 @@ export function useCommonApi() {
   const useSearch = () => {
     return useMutation({
       mutationFn: async (uuid: string) => {
-        const response = await client.common.findByUUID(uuid)
+        const response = await client.aggregate.findByUUID(uuid)
         return response.data
       },
     })

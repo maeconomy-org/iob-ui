@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server'
-import redis from '@/lib/redis'
 import crypto from 'crypto'
+import { NextResponse } from 'next/server'
+
+import redis from '@/lib/redis'
 
 // Handle initial chunk upload and session start
 export async function POST(req: Request) {

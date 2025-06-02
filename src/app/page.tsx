@@ -42,8 +42,8 @@ export default function AuthPage() {
       }
 
       // Extract username from the response
-      const username = response.base.data?.username
-
+      const certFingerprint = response.base.data?.certFingerprint
+      const certCommonName = response.base.data?.certCommonName
       // If we get here, certificate was accepted
       setStatus('success')
 
@@ -51,7 +51,8 @@ export default function AuthPage() {
       login({
         authenticated: true,
         timestamp: Date.now(),
-        username,
+        certFingerprint,
+        certCommonName,
       })
 
       // Redirect to main app

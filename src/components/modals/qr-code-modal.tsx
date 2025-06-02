@@ -10,6 +10,7 @@ import QRCodeStyling, {
 
 import {
   Button,
+  CopyButton,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -136,8 +137,9 @@ export function QRCodeModal({
             <div ref={qrCodeRef} />
           </div>
 
-          <div className="mt-4 font-mono text-xs text-muted-foreground break-all text-center">
-            {uuid}
+          <div className="mt-4 font-mono text-xs text-muted-foreground break-all text-center flex items-center gap-2">
+            <span className="truncate flex">{uuid}</span>
+            <CopyButton text={uuid} label="Object UUID" />
           </div>
 
           <div className="mt-6 flex gap-2 w-full">
