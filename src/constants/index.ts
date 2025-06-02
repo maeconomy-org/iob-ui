@@ -4,9 +4,8 @@ export const APP_DESCRIPTION = 'Material Management System'
 export const APP_ACRONYM = 'IoB'
 
 // Auth-related
-export const AUTH_ENDPOINT = 'https://maeconomy.recheck.io:9443/api/UUObject'
 export const AUTH_SESSION_KEY = 'auth_status'
-export const AUTH_SESSION_TIMEOUT = 60 * 60 * 1000 // 1 hour in milliseconds
+export const AUTH_SESSION_TIMEOUT = 12 * 60 * 60 * 1000 // 12 hours in milliseconds
 
 // Navigation
 export const NAV_ITEMS = [
@@ -19,8 +18,8 @@ export const NAV_ITEMS = [
 // Footer links
 export const FOOTER_LINKS = [
   { name: 'Help', path: '/help' },
-  { name: 'Privacy', path: '/privacy' },
-  { name: 'Terms', path: '/terms' },
+  // { name: 'Privacy', path: '/privacy' },
+  // { name: 'Terms', path: '/terms' },
 ]
 
 // Contact information
