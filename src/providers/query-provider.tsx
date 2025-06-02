@@ -16,9 +16,9 @@ import { API_CONFIG } from '@/lib/api-config'
 // Global singleton cache
 let cachedClientPromise: ReturnType<typeof createClient> | null = null
 
-const IobClientContext = createContext<Awaited<
-  ReturnType<typeof createClient>
-> | null>(null)
+const IobClientContext = createContext<ReturnType<typeof createClient> | null>(
+  null
+)
 
 export function useIobClient() {
   const context = useContext(IobClientContext)
@@ -42,9 +42,9 @@ export function QueryProvider({ children }: PropsWithChildren) {
       })
   )
 
-  const [client, setClient] = useState<Awaited<
-    ReturnType<typeof createClient>
-  > | null>(null)
+  const [client, setClient] = useState<ReturnType<typeof createClient> | null>(
+    null
+  )
   const [error, setError] = useState<Error | null>(null)
 
   useEffect(() => {

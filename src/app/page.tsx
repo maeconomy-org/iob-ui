@@ -141,7 +141,7 @@ export default function AuthPage() {
           </div>
         </Card>
 
-        <div className="flex justify-between items-center text-sm">
+        <div className="flex items-center justify-center text-sm">
           <Link
             href="/help"
             className="text-primary hover:text-primary/80 flex items-center"
@@ -149,25 +149,6 @@ export default function AuthPage() {
             <HelpCircle className="h-4 w-4 mr-1" />
             Need help with certificates?
           </Link>
-          <Link
-            href="https://example.com/contact"
-            className="text-gray-500 hover:text-gray-700"
-          >
-            Contact Support
-          </Link>
-        </div>
-
-        <div className="text-xs text-center text-gray-500">
-          <p>
-            By accessing this system, you agree to our{' '}
-            <Link href="/terms" className="text-primary hover:underline">
-              Terms of Service
-            </Link>{' '}
-            and{' '}
-            <Link href="/privacy" className="text-primary hover:underline">
-              Privacy Policy
-            </Link>
-          </p>
         </div>
       </div>
     </div>
