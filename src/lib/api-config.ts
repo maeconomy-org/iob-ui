@@ -8,7 +8,7 @@ export const API_CONFIG: IOBClientConfig = {
 
   debug: {
     enabled: true,
-    logLevel: 'error',
-    logToConsole: true,
+    logLevel: 'info',
+    logToConsole: false,
   },
 }

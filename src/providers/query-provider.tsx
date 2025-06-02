@@ -7,15 +7,14 @@ import {
   useState,
   useEffect,
 } from 'react'
+import { createClient } from 'iob-client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
-import { createClient } from 'iob-client'
+
 import { API_CONFIG } from '@/lib/api-config'
 
 // Global singleton cache
-let cachedClientPromise: Promise<
-  Awaited<ReturnType<typeof createClient>>
-> | null = null
+let cachedClientPromise: ReturnType<typeof createClient> | null = null
 
 const IobClientContext = createContext<Awaited<
   ReturnType<typeof createClient>
@@ -56,16 +55,7 @@ export function QueryProvider({ children }: PropsWithChildren) {
       cachedClientPromise = createClient(API_CONFIG)
     }
 
-    cachedClientPromise
-      .then((c) => {
-        if (isMounted) setClient(c)
-      })
-      .catch((err) => {
-        if (isMounted)
-          setError(
-            err instanceof Error ? err : new Error('Failed to init client')
-          )
-      })
+    if (isMounted) setClient(cachedClientPromise)
 
     return () => {
       isMounted = false

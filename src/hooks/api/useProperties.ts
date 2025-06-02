@@ -1,58 +1,66 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useIobClient } from '@/providers/query-provider'
-import type { UUPropertyDTO, UUPropertyValueDTO } from 'iob-client'
+import type { UUPropertyDTO, UUPropertyValueDTO, QueryParams } from 'iob-client'
 
 export function useProperties() {
   const client = useIobClient()
   const queryClient = useQueryClient()
 
-  // Get all properties
-  const useAllProperties = (options = {}) => {
+  // Get all properties using the new unified API
+  const useAllProperties = (options?: QueryParams & { enabled?: boolean }) => {
+    const { enabled = true, ...queryParams } = options || {}
     return useQuery({
-      queryKey: ['properties'],
+      queryKey: ['properties', queryParams],
       queryFn: async () => {
-        const response = await client.properties.api.getOwn({
+        const response = await client.properties.getProperties({
           softDeleted: false,
+          ...queryParams,
         })
         return response.data
       },
-      ...options,
+      enabled,
     })
   }
 
-  // Get property by ID
-  const useProperty = (uuid: string, options = {}) => {
+  // Get property by UUID
+  const useProperty = (uuid: string, options?: { enabled?: boolean }) => {
     return useQuery({
       queryKey: ['property', uuid],
       queryFn: async () => {
         if (!uuid) return null
-        const response = await client.properties.api.getById(uuid)
-        return response.data
+        const response = await client.properties.getProperties({ uuid })
+        // Since API returns array, get the first property
+        return response.data?.[0] || null
       },
-      enabled: !!uuid,
-      ...options,
+      enabled: !!uuid && options?.enabled !== false,
     })
   }
 
   // Get property by key
-  const usePropertyByKey = (key: string, options = {}) => {
+  const usePropertyByKey = (
+    key: string,
+    options?: QueryParams & { enabled?: boolean }
+  ) => {
+    const { enabled = true, ...queryParams } = options || {}
     return useQuery({
-      queryKey: ['property', 'key', key],
+      queryKey: ['property', 'key', key, queryParams],
       queryFn: async () => {
         if (!key) return null
-        const response = await client.properties.api.getByKey(key)
+        const response = await client.properties.getPropertyByKey(
+          key,
+          queryParams
+        )
         return response.data
       },
-      enabled: !!key,
-      ...options,
+      enabled: !!key && enabled,
     })
   }
 
-  // Create property mutation
+  // Create property mutation - using new simplified method
   const useCreateProperty = () => {
     return useMutation({
       mutationFn: async (property: UUPropertyDTO) => {
-        const response = await client.properties.api.create(property)
+        const response = await client.properties.create(property)
         return response.data
       },
       onSuccess: () => {
@@ -61,12 +69,12 @@ export function useProperties() {
     })
   }
 
-  // Delete property mutation
+  // Delete property mutation - using new simplified method
   const useDeleteProperty = () => {
     return useMutation({
       mutationFn: async (uuid: string) => {
-        const response = await client.properties.api.delete(uuid)
-        return uuid
+        const response = await client.properties.delete(uuid)
+        return response.data
       },
       onSuccess: (deletedUuid) => {
         queryClient.invalidateQueries({ queryKey: ['properties'] })
@@ -92,6 +100,8 @@ export function useProperties() {
         return { objectUuid, property: response.data }
       },
       onSuccess: ({ objectUuid, property }) => {
+        if (!property) return
+
         // Update the object with properties cache directly
         queryClient.setQueryData(
           ['object', objectUuid, 'withProperties'],
@@ -118,21 +128,28 @@ export function useProperties() {
         queryClient.invalidateQueries({
           queryKey: ['object', objectUuid, 'withProperties'],
         })
+
+        // Also invalidate aggregate queries to refresh table/explorer views
+        queryClient.invalidateQueries({ queryKey: ['aggregates'] })
+        queryClient.invalidateQueries({
+          queryKey: ['aggregate', objectUuid],
+        })
+        queryClient.invalidateQueries({ queryKey: ['properties'] })
       },
     })
   }
 
-  // Get property value by ID
-  const usePropertyValue = (uuid: string, options = {}) => {
+  // Get property value by UUID
+  const usePropertyValue = (uuid: string, options?: { enabled?: boolean }) => {
     return useQuery({
       queryKey: ['propertyValue', uuid],
       queryFn: async () => {
         if (!uuid) return null
-        const response = await client.values.api.getById(uuid)
-        return response.data
+        const response = await client.values.getPropertyValues({ uuid })
+        // Since API returns array, get the first value
+        return response.data?.[0] || null
       },
-      enabled: !!uuid,
-      ...options,
+      enabled: !!uuid && options?.enabled !== false,
     })
   }
 
@@ -150,6 +167,8 @@ export function useProperties() {
         return { propertyUuid, value: response.data }
       },
       onSuccess: ({ propertyUuid, value }) => {
+        if (!value) return
+
         // Try to update object cache directly for the specific property
         queryClient
           .getQueryCache()
@@ -185,6 +204,10 @@ export function useProperties() {
         // Invalidate the property and related queries
         queryClient.invalidateQueries({ queryKey: ['property', propertyUuid] })
         queryClient.invalidateQueries({ queryKey: ['object'] })
+
+        // Also invalidate aggregate queries to refresh table/explorer views
+        queryClient.invalidateQueries({ queryKey: ['aggregates'] })
+        queryClient.invalidateQueries({ queryKey: ['propertyValue'] })
       },
     })
   }
@@ -201,9 +224,8 @@ export function useProperties() {
       }) => {
         // First update the property metadata (like key)
         if (property.uuid) {
-          // Note: The API uses the same endpoint for create and update
-          // When uuid is provided, it updates the existing property
-          await client.properties.api.create({
+          // Use the create method which handles both create and update
+          await client.properties.create({
             uuid: property.uuid,
             key: property.key,
           })
@@ -212,14 +234,14 @@ export function useProperties() {
         // Then process each value
         for (const value of values) {
           if (value.uuid) {
-            // Update existing value
-            await client.values.api.create({
+            // Update existing value using create method
+            await client.values.create({
               uuid: value.uuid,
               value: value.value,
               valueTypeCast: value.valueTypeCast || 'string',
             })
           } else {
-            // Add new value to the property
+            // Add new value to the property using setForProperty method
             await client.values.setForProperty(property.uuid, {
               value: value.value,
               valueTypeCast: value.valueTypeCast || 'string',
@@ -228,8 +250,10 @@ export function useProperties() {
         }
 
         // Return the updated property
-        const response = await client.properties.api.getById(property.uuid)
-        return response.data
+        const response = await client.properties.getProperties({
+          uuid: property.uuid,
+        })
+        return response.data?.[0] || null
       },
       onSuccess: (updatedProperty) => {
         if (!updatedProperty) return
@@ -280,6 +304,9 @@ export function useProperties() {
         })
         queryClient.invalidateQueries({ queryKey: ['propertyValue'] })
         queryClient.invalidateQueries({ queryKey: ['object'] })
+
+        // Also invalidate aggregate queries to refresh table/explorer views
+        queryClient.invalidateQueries({ queryKey: ['aggregates'] })
       },
     })
   }

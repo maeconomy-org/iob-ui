@@ -22,7 +22,7 @@ export const objectModelSchema = z.object({
 })
 
 export const objectSchema = z.object({
-  uuid: z.string(),
+  uuid: z.string().optional(),
   name: z.string().min(1, 'Name is required'),
   abbreviation: z.string().optional(),
   version: z.string().optional(),

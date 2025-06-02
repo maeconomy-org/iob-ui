@@ -147,7 +147,6 @@ export async function POST(req: Request) {
     )
   }
 }
-
 // Function to start processing in the background
 async function startProcessing(jobId: string) {
   // Update job status to processing

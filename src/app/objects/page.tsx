@@ -4,32 +4,61 @@ import { useState, useEffect, useMemo } from 'react'
 import { PlusCircle } from 'lucide-react'
 import { toast } from 'sonner'
 
-import { useObjects } from '@/hooks'
+import { useObjects, useAggregate } from '@/hooks'
 import { Button } from '@/components/ui'
 import { isObjectDeleted } from '@/lib/object-utils'
 import ProtectedRoute from '@/components/protected-route'
 import { ObjectViewContainer } from '@/components/object-views'
 import { ViewSelector, ViewType } from '@/components/view-selector'
 import { ObjectDetailsSheet, ObjectAddSheet } from '@/components/sheets'
+import type { AggregateEntity } from '@/types/iob'
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination'
+import { useAuth } from '@/contexts/auth-context'
 
-// Define augmented object type that includes the fields from the API response
-interface ExtendedObject {
-  uuid: string
-  name: string
-  createdAt: string
-  lastUpdatedAt?: string
-  softDeleted?: boolean
-  softDeletedAt?: string
-  softDeleteBy?: string
-  [key: string]: any // Allow other properties
+// Define extended object type that works with aggregate data
+interface ExtendedObject extends AggregateEntity {
+  // AggregateEntity already has all the fields we need
+  [key: string]: any // Allow other properties for backward compatibility
 }
 
 function ObjectsPageContent() {
-  // Use our custom hooks
-  const { useAllObjects, useDeleteObject, useCreateFullObject } = useObjects()
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(0) // 0-based for API
+  const [pageSize] = useState(12) // Fixed page size - good balance for both views
 
-  // Object queries
-  const { data: allObjects = [], isLoading, isError, error } = useAllObjects()
+  const { certFingerprint } = useAuth()
+
+  // Use aggregate API with pagination for better performance and richer data
+  const { useAggregateEntities } = useAggregate()
+  const { useDeleteObject, useCreateFullObject } = useObjects()
+
+  // Get paginated aggregate data for objects
+  const {
+    data: aggregateResponse,
+    isLoading,
+    isError,
+    error,
+  } = useAggregateEntities(
+    {
+      page: currentPage,
+      size: pageSize,
+      createdBy: certFingerprint,
+    },
+    {
+      staleTime: 30000, // Cache for 30 seconds
+      keepPreviousData: true, // Keep previous page data while loading new page
+    }
+  )
+
+  // Extract content from paginated response
+  const allObjects = aggregateResponse?.content || []
 
   const objectModelsData: any[] = []
 
@@ -40,14 +69,16 @@ function ObjectsPageContent() {
     const uniqueObjects = new Map<string, ExtendedObject>()
 
     // Sort by createdAt in descending order (newest first)
-    const sortedObjects = [...allObjects].sort((a: any, b: any) => {
-      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
-      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
-      return dateB - dateA
-    })
+    const sortedObjects = [...allObjects].sort(
+      (a: AggregateEntity, b: AggregateEntity) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+        return dateB - dateA
+      }
+    )
 
     // Take only the first (newest) object for each UUID
-    sortedObjects.forEach((object: any) => {
+    sortedObjects.forEach((object: AggregateEntity) => {
       if (object.uuid && !uniqueObjects.has(object.uuid)) {
         uniqueObjects.set(object.uuid, object as ExtendedObject)
       }
@@ -72,6 +103,34 @@ function ObjectsPageContent() {
       setViewType(savedView as ViewType)
     }
   }, [])
+
+  // Reset to first page when view type changes
+  useEffect(() => {
+    setCurrentPage(0)
+  }, [viewType])
+
+  // Calculate pagination info
+  const totalPages = aggregateResponse?.totalPages || 0
+  const totalElements = aggregateResponse?.totalElements || 0
+  const isFirstPage = aggregateResponse?.first ?? true
+  const isLastPage = aggregateResponse?.last ?? true
+
+  // Pagination handlers
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
+
+  const handlePrevious = () => {
+    if (!isFirstPage) {
+      setCurrentPage(currentPage - 1)
+    }
+  }
+
+  const handleNext = () => {
+    if (!isLastPage) {
+      setCurrentPage(currentPage + 1)
+    }
+  }
 
   const handleAddObject = () => {
     setSelectedObject(null)
@@ -181,10 +240,12 @@ function ObjectsPageContent() {
     return (
       <div className="flex flex-col items-center justify-center h-96">
         <h3 className="text-xl font-semibold text-red-500">
-          Error loading objects
+          Error loading objects data
         </h3>
-        <p className="text-gray-600">
-          {error instanceof Error ? error.message : 'Unknown error'}
+        <p className="text-gray-600 text-center">
+          {error instanceof Error
+            ? error.message
+            : 'Unknown error occurred while fetching aggregate data'}
         </p>
         <Button className="mt-4" onClick={() => window.location.reload()}>
           Retry
@@ -197,7 +258,9 @@ function ObjectsPageContent() {
     <div className="container mx-auto py-6 px-4">
       <div className="flex flex-col space-y-4">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold">Objects</h1>
+          <div>
+            <h1 className="text-2xl font-bold">Objects</h1>
+          </div>
           <div className="flex items-center gap-4">
             <ViewSelector
               view={viewType}
@@ -219,7 +282,78 @@ function ObjectsPageContent() {
           availableModels={objectModelsData}
           loading={isLoading}
           onViewObject={handleViewObject}
+          // Pass pagination info to views
+          pagination={{
+            currentPage: currentPage + 1, // 1-based for display
+            totalPages,
+            totalElements,
+            pageSize,
+            isFirstPage,
+            isLastPage,
+          }}
         />
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex justify-center mt-6">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={handlePrevious}
+                    className={
+                      isFirstPage
+                        ? 'pointer-events-none opacity-50'
+                        : 'cursor-pointer'
+                    }
+                  />
+                </PaginationItem>
+
+                {/* Show page numbers */}
+                {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+                  let pageNum: number
+
+                  if (totalPages <= 7) {
+                    // Show all pages if 7 or fewer
+                    pageNum = i
+                  } else if (currentPage <= 3) {
+                    // Show first 7 pages
+                    pageNum = i
+                  } else if (currentPage >= totalPages - 4) {
+                    // Show last 7 pages
+                    pageNum = totalPages - 7 + i
+                  } else {
+                    // Show pages around current page
+                    pageNum = currentPage - 3 + i
+                  }
+
+                  return (
+                    <PaginationItem key={pageNum}>
+                      <PaginationLink
+                        onClick={() => handlePageChange(pageNum)}
+                        isActive={currentPage === pageNum}
+                        className="cursor-pointer"
+                      >
+                        {pageNum + 1}
+                      </PaginationLink>
+                    </PaginationItem>
+                  )
+                })}
+
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={handleNext}
+                    className={
+                      isLastPage
+                        ? 'pointer-events-none opacity-50'
+                        : 'cursor-pointer'
+                    }
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        )}
       </div>
 
       {/* Object detail sheet */}

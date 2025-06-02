@@ -18,6 +18,15 @@ import type {
   ApiResponse,
   ApiError,
   IOBClientConfig,
+  // New aggregate types
+  AggregateEntity,
+  AggregateProperty,
+  AggregateFile,
+  AggregateFindDTO,
+  PageAggregateEntity,
+  QueryParams,
+  StatementQueryParams,
+  AuthResponse,
 } from 'iob-client'
 
 // Re-export all types from the iob-client package
@@ -35,6 +44,15 @@ export type {
   ApiResponse,
   ApiError,
   IOBClientConfig,
+  // New aggregate types
+  AggregateEntity,
+  AggregateProperty,
+  AggregateFile,
+  AggregateFindDTO,
+  PageAggregateEntity,
+  QueryParams,
+  StatementQueryParams,
+  AuthResponse,
 }
 
 /**
@@ -104,13 +122,9 @@ export type PaginatedResponse<T> = {
  */
 export type ObjectsHookReturns = {
   useAllObjects: (options?: QueryOptions) => any
-  useObjectsByType: (type: string, options?: QueryOptions) => any
-  useObjectWithProperties: (uuid: UUID, options?: QueryOptions) => any
   useObject: (uuid: UUID, options?: QueryOptions) => any
   useCreateObject: () => any
-  useCreateObjectWithProperties: () => any
   useCreateFullObject: () => any
-  useUpdateObject: () => any
+  useUpdateObjectMetadata: () => any
   useDeleteObject: () => any
-  useAddChildToObject: () => any
 }

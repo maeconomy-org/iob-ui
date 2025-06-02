@@ -6,6 +6,15 @@ import { ViewType } from '@/components/view-selector'
 import { ObjectsTable } from '@/components/tables'
 import { ObjectExplorer } from './object-explorer'
 
+interface PaginationInfo {
+  currentPage: number
+  totalPages: number
+  totalElements: number
+  pageSize: number
+  isFirstPage: boolean
+  isLastPage: boolean
+}
+
 interface ObjectViewContainerProps {
   viewType: ViewType
   data: any[]
@@ -14,6 +23,7 @@ interface ObjectViewContainerProps {
   onViewObject?: (object: any) => void
   onEditObject?: (object: any) => void
   onSaveObject?: (object: any) => void
+  pagination?: PaginationInfo
 }
 
 export function ObjectViewContainer({
@@ -24,6 +34,7 @@ export function ObjectViewContainer({
   onViewObject,
   onEditObject,
   onSaveObject,
+  pagination,
 }: ObjectViewContainerProps) {
   // Show loading state
   if (loading) {
@@ -43,11 +54,18 @@ export function ObjectViewContainer({
           initialData={data}
           availableModels={availableModels}
           onViewObject={onViewObject}
+          pagination={pagination}
         />
       )
 
     case 'explorer':
-      return <ObjectExplorer data={data} availableModels={availableModels} />
+      return (
+        <ObjectExplorer
+          data={data}
+          availableModels={availableModels}
+          pagination={pagination}
+        />
+      )
 
     // case 'columns':
     //   return (
@@ -68,6 +86,7 @@ export function ObjectViewContainer({
           onViewObject={onViewObject}
           onEditObject={onEditObject}
           onSaveObject={onSaveObject}
+          pagination={pagination}
         />
       )
   }

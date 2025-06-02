@@ -20,6 +20,7 @@ import {
   ScrollArea,
   Textarea,
   EditableSection,
+  CopyButton,
 } from '@/components/ui'
 import { PropertySectionEditor } from '@/components/properties'
 import { useObjects, usePropertyManagement } from '@/hooks'
@@ -51,12 +52,15 @@ export function DetailsPanel({
     string | null
   >(null)
 
+  // Add state for description expansion
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
+
   // Temporary editing states
   const [editedObject, setEditedObject] = useState<any>(null)
   const [editedProperties, setEditedProperties] = useState<any[]>([])
 
   // Use the iob-client hooks
-  const { useFullObject, useUpdateObjectMetadata } = useObjects()
+  const { useUpdateObjectMetadata } = useObjects()
 
   // Get the specialized metadata update mutation
   const updateObjectMetadataMutation = useUpdateObjectMetadata()
@@ -81,56 +85,35 @@ export function DetailsPanel({
   const [properties, setProperties] = useState<any[]>([])
   const [objectHistory, setObjectHistory] = useState<ObjectItem[]>([])
 
-  // Fetch full object data when an item is selected
-  const { data: fullObjectData, isLoading } = useFullObject(item?.uuid || '', {
-    enabled: !!item?.uuid,
-  })
-
-  // Process the fetched object data and setup editing states
+  // Process the aggregated item data and setup editing states
   useEffect(() => {
-    if (!fullObjectData) return
+    if (!item) return
 
-    // Extract all object versions and sort by date (newest first)
-    const objects = Array.isArray(fullObjectData.object)
-      ? fullObjectData.object
-      : [fullObjectData.object]
-    const sortedObjects = objects.sort(
-      (a: any, b: any) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    )
+    // Extract object history if available (assuming it's in the item)
+    // For now, we'll set it to empty array since object history might not be in aggregate data
+    setObjectHistory([])
 
-    // Set history to all but the first object
-    setObjectHistory(sortedObjects.slice(1))
-
-    // Process properties
+    // Process properties from the aggregated item data
     const processedProperties =
-      fullObjectData.properties?.map((propGroup: any) => {
-        // Extract property metadata from the first property item
-        const propMeta = propGroup.property?.[0] || {}
-
-        // Extract and combine all values
-        const values =
-          propGroup.values?.flatMap(
-            (valueObj: any) => valueObj.value?.map((val: any) => val) || []
-          ) || []
-
+      item.properties?.map((property: any) => {
         return {
-          ...propMeta,
-          values,
+          uuid: property.uuid,
+          key: property.key,
+          type: property.type,
+          description: property.description,
+          values: property.values || [],
         }
       }) || []
 
     setProperties(processedProperties)
 
     // Setup editing states
-    if (item) {
-      setEditedObject({ ...item })
-      setEditedProperties(processedProperties || [])
-    }
+    setEditedObject({ ...item })
+    setEditedProperties(processedProperties || [])
 
-    // Process files
-    setFiles(fullObjectData.files || [])
-  }, [fullObjectData, item])
+    // Process files from the aggregated item data
+    setFiles(item.files || [])
+  }, [item])
 
   if (!item) {
     return (
@@ -301,8 +284,9 @@ export function DetailsPanel({
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <div className="text-sm font-medium">UUID</div>
-                    <div className="text-sm font-mono text-muted-foreground">
-                      {item?.uuid}
+                    <div className="text-sm font-mono text-muted-foreground flex items-center gap-2">
+                      <span className="truncate flex">{item?.uuid}</span>
+                      <CopyButton text={item?.uuid || ''} label="Object UUID" />
                     </div>
                   </div>
                   <div>
@@ -311,14 +295,6 @@ export function DetailsPanel({
                       {item?.name}
                     </div>
                   </div>
-                  {item?.abbreviation && (
-                    <div>
-                      <div className="text-sm font-medium">Abbreviation</div>
-                      <div className="text-sm text-muted-foreground">
-                        {item?.abbreviation}
-                      </div>
-                    </div>
-                  )}
                   {item?.version && (
                     <div>
                       <div className="text-sm font-medium">Version</div>
@@ -327,11 +303,11 @@ export function DetailsPanel({
                       </div>
                     </div>
                   )}
-                  {item?.description && (
-                    <div className="col-span-2">
-                      <div className="text-sm font-medium">Description</div>
+                  {item?.abbreviation && (
+                    <div>
+                      <div className="text-sm font-medium">Abbreviation</div>
                       <div className="text-sm text-muted-foreground">
-                        {item?.description}
+                        {item?.abbreviation}
                       </div>
                     </div>
                   )}
@@ -350,6 +326,31 @@ export function DetailsPanel({
                     </div>
                   </div>
                 </div>
+
+                {item?.description && (
+                  <div className="mt-4 col-span-2">
+                    <div className="text-sm font-medium">Description</div>
+                    <div className="text-sm text-muted-foreground">
+                      {item.description.length > 100 ? (
+                        <>
+                          {isDescriptionExpanded
+                            ? item.description
+                            : `${item.description.substring(0, 100)}...`}
+                          <button
+                            onClick={() =>
+                              setIsDescriptionExpanded(!isDescriptionExpanded)
+                            }
+                            className="ml-2 text-primary hover:text-primary/80 underline text-xs"
+                          >
+                            {isDescriptionExpanded ? 'Show less' : 'Show more'}
+                          </button>
+                        </>
+                      ) : (
+                        item.description
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Deletion Metadata */}
                 {isDeleted && deletedMetadata && (
@@ -458,16 +459,7 @@ export function DetailsPanel({
             successMessage="Object properties updated successfully"
             renderDisplay={() => (
               <>
-                {isLoading ? (
-                  <div className="py-4 text-center">
-                    <div className="inline-flex items-center gap-2">
-                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
-                      <span className="text-sm text-muted-foreground">
-                        Loading properties...
-                      </span>
-                    </div>
-                  </div>
-                ) : properties && properties.length > 0 ? (
+                {properties && properties.length > 0 ? (
                   <div className="space-y-2">
                     {properties.map((prop, idx) => (
                       <div
@@ -508,9 +500,18 @@ export function DetailsPanel({
                                 <span className="text-sm text-muted-foreground">
                                   UUID:
                                 </span>
-                                <span className="font-mono text-xs">
-                                  {prop.uuid || 'Not set'}
-                                </span>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono text-xs">
+                                    {prop.uuid || 'Not set'}
+                                  </span>
+                                  {prop.uuid && (
+                                    <CopyButton
+                                      text={prop.uuid}
+                                      label="Property UUID"
+                                      size="sm"
+                                    />
+                                  )}
+                                </div>
                               </div>
 
                               {prop.type && (
@@ -568,24 +569,11 @@ export function DetailsPanel({
               </>
             )}
             renderEdit={() => (
-              <>
-                {isLoading ? (
-                  <div className="py-4 text-center">
-                    <div className="inline-flex items-center gap-2">
-                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
-                      <span className="text-sm text-muted-foreground">
-                        Loading properties...
-                      </span>
-                    </div>
-                  </div>
-                ) : (
-                  <PropertySectionEditor
-                    properties={editedProperties}
-                    isEditable={true}
-                    onUpdate={setEditedProperties}
-                  />
-                )}
-              </>
+              <PropertySectionEditor
+                properties={editedProperties}
+                isEditable={true}
+                onUpdate={setEditedProperties}
+              />
             )}
           />
 

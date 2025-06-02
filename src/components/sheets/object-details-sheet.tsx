@@ -1,15 +1,8 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { Trash2, Loader2, ChevronDown, ChevronRight, Clock } from 'lucide-react'
 import { toast } from 'sonner'
-import {
-  Edit,
-  Trash2,
-  Loader2,
-  ChevronDown,
-  ChevronRight,
-  Clock,
-} from 'lucide-react'
 
 import {
   Badge,
@@ -28,9 +21,10 @@ import {
   Textarea,
   Label,
   EditableSection,
+  CopyButton,
 } from '@/components/ui'
 import { PropertySectionEditor } from '@/components/properties'
-import { useObjects, usePropertyManagement } from '@/hooks'
+import { useObjects, usePropertyManagement, useAggregate } from '@/hooks'
 import { formatPropertyValue } from '@/lib/object-utils'
 
 interface ObjectSheetProps {
@@ -56,96 +50,93 @@ export function ObjectDetailsSheet({
   isDeleted,
   onSave,
 }: ObjectSheetProps) {
-  // Get the useFullObject hook to fetch the complete object data
-  const { useFullObject, useUpdateObjectMetadata, useDeleteObject } =
-    useObjects()
-
+  // Get the aggregate hook for rich object data
+  const { useAggregateByUUID } = useAggregate()
+  const { useUpdateObjectMetadata, useDeleteObject } = useObjects()
   // Get the specialized metadata update mutation
   const updateObjectMetadataMutation = useUpdateObjectMetadata()
 
   // Get delete mutation
   const deleteObjectMutation = useDeleteObject()
 
-  // Fetch the full object details if a UUID is provided
-  const { data: fullObjectData, isLoading } = useFullObject(uuid || '', {
-    enabled: !!uuid && isOpen,
+  // Fetch the aggregate object details if a UUID is provided
+  // This provides much richer data including all relationships, properties, and files
+  const {
+    data: aggregateData,
+    isLoading,
+    refetch: refetchAggregate,
+  } = useAggregateByUUID(uuid || '', {
+    enabled: !!uuid && isOpen, // Enable for both cases but will only fetch when needed
+    refetchOnWindowFocus: false,
+    staleTime: 0, // Always consider data stale so it refetches when invalidated
   })
 
-  // Process object data to get the latest version and proper property structure
+  // Process aggregate data to get the object details in the expected format
   const { object, properties, files, objectHistory } = useMemo(() => {
-    if (!fullObjectData) {
+    // Prioritize aggregate data if available (this will be fresh data after mutations)
+    if (aggregateData && aggregateData.length > 0) {
+      const aggregate = aggregateData[0]
+
       return {
-        object: initialObject,
-        properties: [],
-        files: [],
+        object: {
+          uuid: aggregate.uuid || '',
+          name: aggregate.name || '',
+          abbreviation: aggregate.abbreviation || '',
+          version: aggregate.version || '',
+          description: aggregate.description || '',
+          createdAt: aggregate.createdAt || '',
+          lastUpdatedAt: aggregate.lastUpdatedAt || '',
+          softDeleted: aggregate.softDeleted || false,
+          softDeletedAt: aggregate.softDeletedAt || '',
+          softDeleteBy: aggregate.softDeleteBy || '',
+          ...((aggregate as any).modelUuid && {
+            modelUuid: (aggregate as any).modelUuid,
+          }),
+        },
+        properties: (aggregate.properties || []).filter(
+          (prop) => !prop.softDeleted
+        ),
+        files: (aggregate.files || []).filter((file) => !file.softDeleted),
         objectHistory: [],
       }
     }
 
-    // Extract all object versions and sort by date (newest first)
-    const objects = Array.isArray(fullObjectData.object)
-      ? fullObjectData.object
-      : [fullObjectData.object]
-    const sortedObjects = objects.sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    )
-
-    // Always get the latest object (regardless of deletion status)
-    const latestObject = sortedObjects[0]
-
-    // All other objects (for history)
-    const history = sortedObjects.slice(1)
-
-    // Process properties to correct format - filter out soft-deleted ones
-    const processedProperties =
-      fullObjectData.properties
-        ?.map((propGroup: any) => {
-          // Extract property metadata from the first property item that's not soft-deleted
-          const propItems = propGroup.property || []
-          const validPropItems = propItems.filter(
-            (item: any) => !item.softDeleted
-          )
-          const propMeta =
-            validPropItems.length > 0 ? validPropItems[0] : propItems[0] || {}
-
-          // Extract and combine all values that are not soft-deleted
-          const values =
-            propGroup.values?.flatMap((valueObj: any) => {
-              // Filter out soft-deleted value objects
-              if (valueObj.softDeleted) return []
-              // Get non-soft-deleted values from each value object
-              return (
-                valueObj.value
-                  ?.filter((val: any) => !val.softDeleted)
-                  .map((val: any) => val) || []
-              )
-            }) || []
-
-          // Skip entirely soft-deleted properties
-          if (propMeta.softDeleted) {
-            return null
-          }
-
-          return {
-            ...propMeta,
-            values,
-          }
-        })
-        .filter(Boolean) || []
-
-    // Process files - filter out soft-deleted ones
-    const processedFiles = (fullObjectData.files || []).filter(
-      (file: any) => !file.softDeleted
-    )
-
-    return {
-      object: latestObject,
-      properties: processedProperties,
-      files: processedFiles,
-      objectHistory: history,
+    // Fall back to initialObject if provided and no aggregate data yet
+    if (initialObject) {
+      return {
+        object: {
+          uuid: initialObject.uuid || '',
+          name: initialObject.name || '',
+          abbreviation: initialObject.abbreviation || '',
+          version: initialObject.version || '',
+          description: initialObject.description || '',
+          createdAt: initialObject.createdAt || '',
+          lastUpdatedAt: initialObject.lastUpdatedAt || '',
+          softDeleted: initialObject.softDeleted || false,
+          softDeletedAt: initialObject.softDeletedAt || '',
+          softDeleteBy: initialObject.softDeleteBy || '',
+          ...(initialObject.modelUuid && {
+            modelUuid: initialObject.modelUuid,
+          }),
+        },
+        properties: (initialObject.properties || []).filter(
+          (prop: any) => !prop.softDeleted
+        ),
+        files: (initialObject.files || []).filter(
+          (file: any) => !file.softDeleted
+        ),
+        objectHistory: [],
+      }
     }
-  }, [fullObjectData, initialObject])
+
+    // No data available
+    return {
+      object: null,
+      properties: [],
+      files: [],
+      objectHistory: [],
+    }
+  }, [aggregateData, initialObject])
 
   // State for property and file management
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
@@ -162,6 +153,9 @@ export function ObjectDetailsSheet({
     null
   )
 
+  // Add state for description expansion
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
+
   // Temporary editing states
   const [editedObject, setEditedObject] = useState<any>(null)
   const [editedProperties, setEditedProperties] = useState<any[]>([])
@@ -173,6 +167,16 @@ export function ObjectDetailsSheet({
       setEditedProperties(properties || [])
     }
   }, [object, properties])
+
+  // Reset editing states when data changes (after mutations)
+  useEffect(() => {
+    if (object && !isMetadataEditing && !isPropertiesEditing) {
+      setEditedObject({ ...object })
+    }
+    if (properties && !isPropertiesEditing) {
+      setEditedProperties([...properties])
+    }
+  }, [object, properties, isMetadataEditing, isPropertiesEditing])
 
   // Exit early if no object and still loading
   if (!object && isOpen && !isLoading) {
@@ -189,7 +193,6 @@ export function ObjectDetailsSheet({
     updatePropertyWithValues,
     createPropertyForObject,
     removePropertyFromObject,
-    isLoading: isPropertyUpdateLoading,
   } = usePropertyManagement(object?.uuid)
 
   // Function to toggle property expansion
@@ -223,7 +226,7 @@ export function ObjectDetailsSheet({
 
       try {
         // Call the API to update metadata
-        await updateObjectMetadataMutation.mutateAsync({
+        const updatedObject = await updateObjectMetadataMutation.mutateAsync({
           uuid: object.uuid,
           name: editedObject.name,
           abbreviation: editedObject.abbreviation,
@@ -231,8 +234,25 @@ export function ObjectDetailsSheet({
           description: editedObject.description,
         })
 
+        // Reset the editing state to reflect the updated data
+        if (updatedObject) {
+          setEditedObject({
+            ...object,
+            name: updatedObject.name || editedObject.name,
+            abbreviation:
+              updatedObject.abbreviation || editedObject.abbreviation,
+            version: updatedObject.version || editedObject.version,
+            description: updatedObject.description || editedObject.description,
+          })
+        }
+
         // Show success toast
         toast.success('Object metadata updated successfully', { id: toastId })
+
+        // Manually trigger a refetch to ensure UI updates immediately
+        if (uuid && refetchAggregate) {
+          refetchAggregate()
+        }
 
         // Exit edit mode
         setActiveEditingSection(null)
@@ -260,7 +280,7 @@ export function ObjectDetailsSheet({
         }
 
         // Additional check: compare with original properties
-        const originalProp = properties.find((p) => p.uuid === prop.uuid)
+        const originalProp = properties.find((p: any) => p.uuid === prop.uuid)
         if (!originalProp) return false
 
         // Check if key has changed
@@ -344,8 +364,16 @@ export function ObjectDetailsSheet({
         // Wait for all operations to complete
         await Promise.all(operations)
 
+        // Reset the editing properties to reflect the current state
+        // The useEffect will handle this when the cache updates
+
         // Show success toast
         toast.success('Object properties updated successfully', { id: toastId })
+
+        // Manually trigger a refetch to ensure UI updates immediately
+        if (uuid && refetchAggregate) {
+          refetchAggregate()
+        }
 
         // Exit edit mode
         setActiveEditingSection(null)
@@ -402,13 +430,14 @@ export function ObjectDetailsSheet({
                 <Badge variant="destructive">Deleted</Badge>
               )}
             </span>
-            {model && (
-              <SheetDescription>
+            <SheetDescription>
+              {(model || object?.version) && (
                 <Badge variant="outline">
-                  {model.name} {model.version && `v${model.version}`}
+                  {model && model.name}{' '}
+                  {object?.version && `v${object?.version}`}
                 </Badge>
-              </SheetDescription>
-            )}
+              )}
+            </SheetDescription>
           </SheetHeader>
 
           {isLoading ? (
@@ -419,7 +448,7 @@ export function ObjectDetailsSheet({
             <div className="space-y-6 py-6">
               {/* Metadata Section - Now Editable */}
               <EditableSection
-                title="Object Metadata"
+                title="Metadata"
                 isEditing={isMetadataEditing}
                 onEditToggle={(isEditing) =>
                   handleEditToggle('metadata', isEditing)
@@ -431,8 +460,12 @@ export function ObjectDetailsSheet({
                   <div className="grid grid-cols-1 gap-3">
                     <div>
                       <div className="text-sm font-medium">UUID</div>
-                      <div className="text-sm font-mono text-muted-foreground">
-                        {object?.uuid}
+                      <div className="text-sm font-mono text-muted-foreground flex items-center gap-2">
+                        <span className="truncate flex">{object?.uuid}</span>
+                        <CopyButton
+                          text={object?.uuid || ''}
+                          label="Object UUID"
+                        />
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
@@ -442,16 +475,6 @@ export function ObjectDetailsSheet({
                           {object?.name}
                         </div>
                       </div>
-                      {object?.abbreviation && (
-                        <div>
-                          <div className="text-sm font-medium">
-                            Abbreviation
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {object?.abbreviation}
-                          </div>
-                        </div>
-                      )}
                       {object?.version && (
                         <div>
                           <div className="text-sm font-medium">Version</div>
@@ -460,11 +483,13 @@ export function ObjectDetailsSheet({
                           </div>
                         </div>
                       )}
-                      {object?.description && (
+                      {object?.abbreviation && (
                         <div>
-                          <div className="text-sm font-medium">Description</div>
+                          <div className="text-sm font-medium">
+                            Abbreviation
+                          </div>
                           <div className="text-sm text-muted-foreground">
-                            {object?.description}
+                            {object?.abbreviation}
                           </div>
                         </div>
                       )}
@@ -485,17 +510,21 @@ export function ObjectDetailsSheet({
                       )}
 
                       {/* Display soft delete metadata if object is deleted */}
-                      {(object?.softDeleted || isDeleted) && (
+                      {object?.softDeleted && isDeleted && (
                         <>
-                          <div>
-                            <div className="text-sm font-medium text-destructive">
-                              Deleted At
+                          {object?.softDeletedAt && (
+                            <div>
+                              <div className="text-sm font-medium text-destructive">
+                                Deleted At
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                {object?.softDeletedAt &&
+                                  new Date(
+                                    object.softDeletedAt
+                                  ).toLocaleString()}
+                              </div>
                             </div>
-                            <div className="text-sm text-muted-foreground">
-                              {object?.softDeletedAt &&
-                                new Date(object.softDeletedAt).toLocaleString()}
-                            </div>
-                          </div>
+                          )}
                           {object?.softDeleteBy && (
                             <div>
                               <div className="text-sm font-medium text-destructive">
@@ -506,15 +535,45 @@ export function ObjectDetailsSheet({
                                 title={object.softDeleteBy}
                                 aria-label={object.softDeleteBy}
                               >
-                                {object.softDeleteBy.substring(
-                                  object.softDeleteBy.length - 30
-                                )}
+                                {object.softDeleteBy.length > 30
+                                  ? object.softDeleteBy.substring(
+                                      object.softDeleteBy.length - 30
+                                    ) + '...'
+                                  : object.softDeleteBy}
                               </div>
                             </div>
                           )}
                         </>
                       )}
                     </div>
+                    {object?.description && (
+                      <div>
+                        <div className="text-sm font-medium">Description</div>
+                        <div className="text-sm text-muted-foreground">
+                          {object.description.length > 100 ? (
+                            <>
+                              {isDescriptionExpanded
+                                ? object.description
+                                : `${object.description.substring(0, 100)}...`}
+                              <button
+                                onClick={() =>
+                                  setIsDescriptionExpanded(
+                                    !isDescriptionExpanded
+                                  )
+                                }
+                                className="ml-2 text-primary hover:text-primary/80 underline text-xs"
+                              >
+                                {isDescriptionExpanded
+                                  ? 'Show less'
+                                  : 'Show more'}
+                              </button>
+                            </>
+                          ) : (
+                            object.description
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
                 renderEdit={() => (
@@ -633,9 +692,18 @@ export function ObjectDetailsSheet({
                                     <span className="text-sm text-muted-foreground">
                                       UUID:
                                     </span>
-                                    <span className="font-mono text-xs">
-                                      {prop.uuid || 'Not set'}
-                                    </span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-mono text-xs">
+                                        {prop.uuid || 'Not set'}
+                                      </span>
+                                      {prop.uuid && (
+                                        <CopyButton
+                                          text={prop.uuid}
+                                          label="Property UUID"
+                                          size="sm"
+                                        />
+                                      )}
+                                    </div>
                                   </div>
 
                                   {prop.type && (
@@ -763,7 +831,7 @@ export function ObjectDetailsSheet({
                           className="flex items-center p-0 hover:bg-transparent"
                         >
                           <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                            Object History ({objectHistory.length})
+                            History ({objectHistory.length})
                           </h3>
                           {isHistoryOpen ? (
                             <ChevronDown className="h-4 w-4 ml-2" />
@@ -775,7 +843,7 @@ export function ObjectDetailsSheet({
                     </div>
 
                     <CollapsibleContent className="space-y-3">
-                      {objectHistory.map((historyItem, index) => (
+                      {objectHistory.map((historyItem: any, index: number) => (
                         <div key={index} className="bg-muted/20 rounded-md p-3">
                           <div className="flex justify-between items-center mb-2">
                             <span className="text-sm font-medium">

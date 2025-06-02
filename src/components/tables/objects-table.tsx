@@ -2,13 +2,7 @@
 
 import { MouseEvent, useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import {
-  FileText,
-  ChevronRight,
-  ChevronDown,
-  Trash2,
-  QrCode,
-} from 'lucide-react'
+import { FileText, Trash2, QrCode } from 'lucide-react'
 import { toast } from 'sonner'
 
 import {
@@ -19,6 +13,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  CopyButton,
 } from '@/components/ui'
 import { useObjects } from '@/hooks'
 import { objectsData } from '@/lib/data'
@@ -31,6 +26,14 @@ interface ObjectsTableProps {
   onViewObject?: (object: any) => void
   onEditObject?: (object: any) => void
   onSaveObject?: (object: any) => void
+  pagination?: {
+    currentPage: number
+    totalPages: number
+    totalElements: number
+    pageSize: number
+    isFirstPage: boolean
+    isLastPage: boolean
+  }
 }
 
 const isObjectDeleted = (object: any) => {
@@ -42,6 +45,7 @@ export function ObjectsTable({
   initialData,
   showParentLink = true,
   onViewObject,
+  pagination,
 }: ObjectsTableProps) {
   const router = useRouter()
   const [data, setData] = useState<any[]>([])
@@ -161,22 +165,6 @@ export function ObjectsTable({
           <TableCell className="font-medium">
             <div className="flex items-center">
               <div style={{ width: `${level * 16}px` }} />
-              {hasChildren && showParentLink ? (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 mr-1"
-                  onClick={(e) => toggleRow(object.uuid, e)}
-                >
-                  {isExpanded ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" />
-                  )}
-                </Button>
-              ) : (
-                <div className="w-7" />
-              )}
               <span
                 className={`truncate max-w-[200px] ${
                   isDeleted ? 'line-through text-destructive' : ''
@@ -190,7 +178,10 @@ export function ObjectsTable({
             </div>
           </TableCell>
           <TableCell className="font-mono text-xs text-muted-foreground truncate">
-            {object.uuid}
+            <div className="flex items-center gap-2">
+              <span className="truncate flex">{object.uuid}</span>
+              <CopyButton text={object.uuid} label="UUID" />
+            </div>
           </TableCell>
           <TableCell>{formatDate(object.createdAt)}</TableCell>
           <TableCell>
@@ -234,9 +225,9 @@ export function ObjectsTable({
         </TableRow>,
       ]
 
-      if (hasChildren && isExpanded) {
-        rows.push(...renderRows(object.children, level + 1))
-      }
+      // if (hasChildren && isExpanded) {
+      //   rows.push(...renderRows(object.children, level + 1))
+      // }
 
       return rows
     })
@@ -249,7 +240,7 @@ export function ObjectsTable({
   }
 
   return (
-    <>
+    <div className="flex flex-col">
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -261,22 +252,56 @@ export function ObjectsTable({
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>{renderRows(data)}</TableBody>
+          <TableBody>
+            {isLoading ? (
+              <TableRow>
+                <TableCell className="text-center py-8" {...{ colSpan: 5 }}>
+                  <div className="flex items-center justify-center">
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent mr-2"></div>
+                    Loading objects...
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : data.length === 0 ? (
+              <TableRow>
+                <TableCell className="text-center py-8" {...{ colSpan: 5 }}>
+                  <div className="flex flex-col items-center">
+                    <FileText className="h-10 w-10 text-muted-foreground/50 mb-4" />
+                    <h3 className="text-lg font-medium mb-2">
+                      No Objects Found
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      There are no objects to display
+                    </p>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : (
+              renderRows(data)
+            )}
+          </TableBody>
         </Table>
       </div>
 
-      <DeleteConfirmationDialog
-        open={isDeleteModalOpen}
-        onOpenChange={setIsDeleteModalOpen}
-        objectName={objectToDelete?.name || 'this object'}
-        onDelete={() => {
-          if (objectToDelete) {
-            handleDeleteConfirm(objectToDelete.uuid)
-          }
-        }}
-      />
+      {/* Pagination info footer */}
+      {pagination && (
+        <div className="flex items-center justify-between px-2 py-4">
+          <div className="text-sm text-muted-foreground">
+            Showing {(pagination.currentPage - 1) * pagination.pageSize + 1}-
+            {Math.min(
+              pagination.currentPage * pagination.pageSize,
+              pagination.totalElements
+            )}{' '}
+            of {pagination.totalElements} objects
+          </div>
+          <div className="text-sm text-muted-foreground">
+            Page {pagination.currentPage} of {pagination.totalPages}
+          </div>
+        </div>
+      )}
 
-      {selectedQRObject && (
+      {/* QR Code Modal */}
+      {isQRCodeModalOpen && selectedQRObject && (
         <QRCodeModal
           isOpen={isQRCodeModalOpen}
           onClose={() => setIsQRCodeModalOpen(false)}
@@ -284,6 +309,16 @@ export function ObjectsTable({
           objectName={selectedQRObject.name}
         />
       )}
-    </>
+
+      {/* Delete Confirmation Dialog */}
+      {isDeleteModalOpen && objectToDelete && (
+        <DeleteConfirmationDialog
+          open={isDeleteModalOpen}
+          onOpenChange={setIsDeleteModalOpen}
+          objectName={objectToDelete.name}
+          onDelete={() => handleDeleteConfirm(objectToDelete.uuid)}
+        />
+      )}
+    </div>
   )
 }
