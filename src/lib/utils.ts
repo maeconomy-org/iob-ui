@@ -13,3 +13,10 @@ export function generateUUIDv7(): string {
   // give some properties so that the uuid is more unique as uuidv7 uses the current time
   return uuidv7()
 }
+
+export const formatFingerprint = (fingerprint: string) => {
+  if (!fingerprint) return ''
+  return fingerprint.length > 24
+    ? `${fingerprint.slice(0, 24)}...`
+    : fingerprint
+}

@@ -1,8 +1,14 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
-import { Trash2, Loader2, ChevronDown, ChevronRight, Clock } from 'lucide-react'
-import { toast } from 'sonner'
+import { useState, useEffect } from 'react'
+import {
+  Trash2,
+  Loader2,
+  ChevronDown,
+  ChevronRight,
+  Clock,
+  MapPin,
+} from 'lucide-react'
 
 import {
   Badge,
@@ -23,20 +29,32 @@ import {
   EditableSection,
   CopyButton,
 } from '@/components/ui'
+import { DeleteConfirmationDialog } from '@/components/modals'
+import { HereAddressAutocomplete } from '@/components/ui/'
 import { PropertySectionEditor } from '@/components/properties'
-import { useObjects, usePropertyManagement, useAggregate } from '@/hooks'
 import { formatPropertyValue } from '@/lib/object-utils'
+
+// Import our extracted hooks and utilities
+import {
+  useObjectData,
+  useAddressManagement,
+  usePropertyEditor,
+  useObjectOperations,
+} from '../hooks'
+import {
+  getObjectDisplayName,
+  getObjectTimestamps,
+  getSoftDeleteInfo,
+} from '../utils'
+import { formatFingerprint } from '@/lib/utils'
+import { useUnifiedDelete } from '@/hooks'
 
 interface ObjectSheetProps {
   isOpen: boolean
   onClose: () => void
   object?: any // Optional fallback object data
   uuid?: string // Object UUID to fetch from API
-  availableModels: any[]
-  onDelete?: (objectId: string) => void
-  onEdit?: () => void
   isDeleted?: boolean
-  onSave?: (object: any, originalObject?: any) => void
 }
 
 export function ObjectDetailsSheet({
@@ -44,156 +62,70 @@ export function ObjectDetailsSheet({
   onClose,
   object: initialObject,
   uuid,
-  availableModels = [],
-  onDelete,
-  onEdit,
   isDeleted,
-  onSave,
 }: ObjectSheetProps) {
-  // Get the aggregate hook for rich object data
-  const { useAggregateByUUID } = useAggregate()
-  const { useUpdateObjectMetadata, useDeleteObject } = useObjects()
-  // Get the specialized metadata update mutation
-  const updateObjectMetadataMutation = useUpdateObjectMetadata()
-
-  // Get delete mutation
-  const deleteObjectMutation = useDeleteObject()
-
-  // Fetch the aggregate object details if a UUID is provided
-  // This provides much richer data including all relationships, properties, and files
-  const {
-    data: aggregateData,
-    isLoading,
-    refetch: refetchAggregate,
-  } = useAggregateByUUID(uuid || '', {
-    enabled: !!uuid && isOpen, // Enable for both cases but will only fetch when needed
-    refetchOnWindowFocus: false,
-    staleTime: 0, // Always consider data stale so it refetches when invalidated
-  })
-
-  // Process aggregate data to get the object details in the expected format
-  const { object, properties, files, objectHistory } = useMemo(() => {
-    // Prioritize aggregate data if available (this will be fresh data after mutations)
-    if (aggregateData && aggregateData.length > 0) {
-      const aggregate = aggregateData[0]
-
-      return {
-        object: {
-          uuid: aggregate.uuid || '',
-          name: aggregate.name || '',
-          abbreviation: aggregate.abbreviation || '',
-          version: aggregate.version || '',
-          description: aggregate.description || '',
-          createdAt: aggregate.createdAt || '',
-          lastUpdatedAt: aggregate.lastUpdatedAt || '',
-          softDeleted: aggregate.softDeleted || false,
-          softDeletedAt: aggregate.softDeletedAt || '',
-          softDeleteBy: aggregate.softDeleteBy || '',
-          ...((aggregate as any).modelUuid && {
-            modelUuid: (aggregate as any).modelUuid,
-          }),
-        },
-        properties: (aggregate.properties || []).filter(
-          (prop) => !prop.softDeleted
-        ),
-        files: (aggregate.files || []).filter((file) => !file.softDeleted),
-        objectHistory: [],
-      }
-    }
-
-    // Fall back to initialObject if provided and no aggregate data yet
-    if (initialObject) {
-      return {
-        object: {
-          uuid: initialObject.uuid || '',
-          name: initialObject.name || '',
-          abbreviation: initialObject.abbreviation || '',
-          version: initialObject.version || '',
-          description: initialObject.description || '',
-          createdAt: initialObject.createdAt || '',
-          lastUpdatedAt: initialObject.lastUpdatedAt || '',
-          softDeleted: initialObject.softDeleted || false,
-          softDeletedAt: initialObject.softDeletedAt || '',
-          softDeleteBy: initialObject.softDeleteBy || '',
-          ...(initialObject.modelUuid && {
-            modelUuid: initialObject.modelUuid,
-          }),
-        },
-        properties: (initialObject.properties || []).filter(
-          (prop: any) => !prop.softDeleted
-        ),
-        files: (initialObject.files || []).filter(
-          (file: any) => !file.softDeleted
-        ),
-        objectHistory: [],
-      }
-    }
-
-    // No data available
-    return {
-      object: null,
-      properties: [],
-      files: [],
-      objectHistory: [],
-    }
-  }, [aggregateData, initialObject])
-
-  // State for property and file management
+  // State for UI interactions
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
-
-  // Section editing states - combined into a single activeEditingSection state
   const [activeEditingSection, setActiveEditingSection] = useState<
     string | null
   >(null)
-  const isMetadataEditing = activeEditingSection === 'metadata'
-  const isPropertiesEditing = activeEditingSection === 'properties'
-
-  // State for expanded property in view mode
   const [expandedPropertyId, setExpandedPropertyId] = useState<string | null>(
     null
   )
-
-  // Add state for description expansion
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
 
-  // Temporary editing states
-  const [editedObject, setEditedObject] = useState<any>(null)
-  const [editedProperties, setEditedProperties] = useState<any[]>([])
+  // Derived states for editing modes
+  const isMetadataEditing = activeEditingSection === 'metadata'
+  const isPropertiesEditing = activeEditingSection === 'properties'
+  const isAddressEditing = activeEditingSection === 'address'
 
-  // Set up initial editing states when object changes
-  useMemo(() => {
-    if (object) {
-      setEditedObject({ ...object })
-      setEditedProperties(properties || [])
-    }
-  }, [object, properties])
+  // Use our extracted hooks
+  const {
+    object,
+    properties,
+    objectHistory,
+    addressInfo,
+    isLoading,
+    refetchAggregate,
+  } = useObjectData({
+    uuid,
+    initialObject,
+    isOpen,
+  })
 
-  // Reset editing states when data changes (after mutations)
-  useEffect(() => {
-    if (object && !isMetadataEditing && !isPropertiesEditing) {
-      setEditedObject({ ...object })
-    }
-    if (properties && !isPropertiesEditing) {
-      setEditedProperties([...properties])
-    }
-  }, [object, properties, isMetadataEditing, isPropertiesEditing])
+  const { addressData, editedAddressData, setEditedAddressData, saveAddress } =
+    useAddressManagement({
+      initialAddressInfo: addressInfo,
+      objectUuid: object?.uuid,
+    })
+
+  const { editedProperties, setEditedProperties, saveProperties } =
+    usePropertyEditor({
+      initialProperties: properties,
+      objectUuid: object?.uuid,
+      isEditing: isPropertiesEditing,
+    })
+
+  const { editedObject, setEditedObject, saveMetadata } = useObjectOperations({
+    initialObject: object,
+    isEditing: isMetadataEditing,
+    onRefetch: refetchAggregate,
+  })
+
+  // Unified delete hook
+  const {
+    isDeleteModalOpen,
+    objectToDelete,
+    isDeleting,
+    handleDelete,
+    handleDeleteConfirm,
+    handleDeleteCancel,
+  } = useUnifiedDelete()
 
   // Exit early if no object and still loading
   if (!object && isOpen && !isLoading) {
     return null
   }
-
-  // Find model data if applicable
-  const model = object?.modelUuid
-    ? availableModels.find((m) => m.uuid === object.modelUuid)
-    : null
-
-  // Use our property management hook
-  const {
-    updatePropertyWithValues,
-    createPropertyForObject,
-    removePropertyFromObject,
-  } = usePropertyManagement(object?.uuid)
 
   // Function to toggle property expansion
   const togglePropertyExpansion = (propertyId: string) => {
@@ -202,222 +134,66 @@ export function ObjectDetailsSheet({
     )
   }
 
-  // Handle saving changes to object metadata
-  const handleSaveMetadata = async (): Promise<void> => {
-    if (!editedObject || !object) return
-
-    try {
-      // Check if anything has actually changed before calling onSave
-      const hasChanged =
-        editedObject.name !== object.name ||
-        editedObject.abbreviation !== object.abbreviation ||
-        editedObject.version !== object.version ||
-        editedObject.description !== object.description
-
-      if (!hasChanged) {
-        // No changes, just close the editing mode
-        setActiveEditingSection(null)
-        return
-      }
-
-      // Show a single toast for the operation
-      const toastId = 'update-metadata-' + Date.now()
-      toast.loading('Updating object metadata...', { id: toastId })
-
-      try {
-        // Call the API to update metadata
-        const updatedObject = await updateObjectMetadataMutation.mutateAsync({
-          uuid: object.uuid,
-          name: editedObject.name,
-          abbreviation: editedObject.abbreviation,
-          version: editedObject.version,
-          description: editedObject.description,
-        })
-
-        // Reset the editing state to reflect the updated data
-        if (updatedObject) {
-          setEditedObject({
-            ...object,
-            name: updatedObject.name || editedObject.name,
-            abbreviation:
-              updatedObject.abbreviation || editedObject.abbreviation,
-            version: updatedObject.version || editedObject.version,
-            description: updatedObject.description || editedObject.description,
-          })
-        }
-
-        // Show success toast
-        toast.success('Object metadata updated successfully', { id: toastId })
-
-        // Manually trigger a refetch to ensure UI updates immediately
-        if (uuid && refetchAggregate) {
-          refetchAggregate()
-        }
-
-        // Exit edit mode
-        setActiveEditingSection(null)
-      } catch (error) {
-        // Show error toast
-        toast.error('Failed to update object metadata', { id: toastId })
-        console.error('Error saving metadata:', error)
-      }
-    } catch (error) {
-      console.error('Error in metadata update process:', error)
-      toast.error('Failed to process metadata updates')
-    }
-  }
-
-  // Handle saving changes to properties
-  const handleSaveProperties = async (): Promise<void> => {
-    if (!editedProperties || !object) return
-
-    try {
-      // Create an array of properties that need to be updated
-      const propertiesToUpdate = editedProperties.filter((prop) => {
-        // Check if the property has been flagged as modified, deleted, or is new
-        if (prop._isNew || prop._deleted || prop._modified) {
-          return true
-        }
-
-        // Additional check: compare with original properties
-        const originalProp = properties.find((p: any) => p.uuid === prop.uuid)
-        if (!originalProp) return false
-
-        // Check if key has changed
-        if (prop.key !== originalProp.key) return true
-
-        // Check if values have changed
-        if (prop.values?.length !== originalProp.values?.length) return true
-
-        // Check if any value content has changed
-        const valuesChanged = prop.values?.some((val: any, i: number) => {
-          const origVal = originalProp.values?.[i]
-          return !origVal || val.value !== origVal.value
-        })
-
-        return valuesChanged
-      })
-
-      // If no changes, just close the editing mode
-      if (propertiesToUpdate.length === 0) {
-        setActiveEditingSection(null)
-        return
-      }
-
-      // Show a single toast for the entire operation
-      let toastId = 'update-properties-' + Date.now()
-      toast.loading('Updating object properties...', { id: toastId })
-
-      try {
-        // Create an array to track all API operations
-        const operations = []
-
-        // Process each property that needs updating
-        for (const property of propertiesToUpdate) {
-          if (property._deleted) {
-            // Delete property if marked for deletion
-            operations.push(
-              removePropertyFromObject(object.uuid, property.uuid)
-            )
-          } else if (property._isNew) {
-            // Create new property with only key and values
-            // Filter out any empty values
-            const nonEmptyValues = (property.values || []).filter(
-              (val: any) =>
-                // Skip empty values
-                val.value !== undefined &&
-                val.value !== '' &&
-                // Skip values marked as needing input (from the collapsible-property component)
-                val._needsInput !== true
-            )
-
-            operations.push(
-              createPropertyForObject(object.uuid, {
-                key: property.key,
-                values: nonEmptyValues,
-              })
-            )
-          } else {
-            // Update existing property - don't rely on _modified flag exclusively
-            // Filter out any empty values
-            const nonEmptyValues = (property.values || []).filter(
-              (val: any) =>
-                // Skip empty values
-                val.value !== undefined &&
-                val.value !== '' &&
-                // Skip values marked as needing input (from the collapsible-property component)
-                val._needsInput !== true
-            )
-
-            operations.push(
-              updatePropertyWithValues(
-                {
-                  uuid: property.uuid,
-                  key: property.key, // This will update the key/name
-                },
-                nonEmptyValues // Only include non-empty values
-              )
-            )
-          }
-        }
-
-        // Wait for all operations to complete
-        await Promise.all(operations)
-
-        // Reset the editing properties to reflect the current state
-        // The useEffect will handle this when the cache updates
-
-        // Show success toast
-        toast.success('Object properties updated successfully', { id: toastId })
-
-        // Manually trigger a refetch to ensure UI updates immediately
-        if (uuid && refetchAggregate) {
-          refetchAggregate()
-        }
-
-        // Exit edit mode
-        setActiveEditingSection(null)
-      } catch (error) {
-        // Show error toast
-        toast.error('Failed to update object properties', { id: toastId })
-        console.error('Error saving properties:', error)
-      }
-    } catch (error) {
-      console.error('Error in property update process:', error)
-      toast.error('Failed to process property updates')
-    }
-  }
-
   // Handle section edit toggling
   const handleEditToggle = (section: string, isEditing: boolean) => {
     if (isEditing) {
-      // Activate this section
       setActiveEditingSection(section)
     } else {
-      // Deactivate only if this section is active
       if (activeEditingSection === section) {
         setActiveEditingSection(null)
       }
     }
   }
 
-  // Handle object deletion
-  const handleDeleteObject = async (objectId: string) => {
-    if (!objectId) return
-
+  // Handle saving operations
+  const handleSaveMetadata = async (): Promise<void> => {
     try {
-      toast.promise(deleteObjectMutation.mutateAsync(objectId), {
-        loading: 'Deleting object...',
-        success: 'Object deleted successfully',
-        error: 'Failed to delete object',
-      })
-
-      // Close the sheet after deletion
-      onClose()
+      await saveMetadata()
+      setActiveEditingSection(null)
     } catch (error) {
-      console.error('Error deleting object:', error)
+      // Error handling is done in the hook
     }
   }
+
+  const handleSaveProperties = async (): Promise<void> => {
+    try {
+      await saveProperties()
+      // Manually trigger a refetch to ensure UI updates immediately
+      if (uuid && refetchAggregate) {
+        refetchAggregate()
+      }
+      setActiveEditingSection(null)
+    } catch (error) {
+      // Error handling is done in the hook
+    }
+  }
+
+  const handleSaveAddress = async (): Promise<void> => {
+    try {
+      await saveAddress()
+      setActiveEditingSection(null)
+    } catch (error) {
+      // Error handling is done in the hook
+    }
+  }
+
+  // Handle object deletion with unified modal
+  const handleDeleteObject = (objectId: string, objectName: string) => {
+    handleDelete({ uuid: objectId, name: objectName })
+  }
+
+  // Close sheet after successful delete
+  useEffect(() => {
+    if (!isDeleteModalOpen && objectToDelete) {
+      // If modal was closed and we had an object to delete, close the sheet
+      onClose()
+    }
+  }, [isDeleteModalOpen, objectToDelete, onClose])
+
+  // Get computed values
+  const objectName = getObjectDisplayName(object)
+  const { created, updated } = getObjectTimestamps(object)
+  const softDeleteInfo = getSoftDeleteInfo(object)
 
   return (
     <>
@@ -425,19 +201,12 @@ export function ObjectDetailsSheet({
         <SheetContent className="sm:max-w-xl overflow-y-auto">
           <SheetHeader>
             <span className="flex items-center gap-2">
-              <SheetTitle>{object?.name}</SheetTitle>
+              <SheetTitle>{objectName}</SheetTitle>
               {(object?.softDeleted || isDeleted) && (
                 <Badge variant="destructive">Deleted</Badge>
               )}
             </span>
-            <SheetDescription>
-              {(model || object?.version) && (
-                <Badge variant="outline">
-                  {model && model.name}{' '}
-                  {object?.version && `v${object?.version}`}
-                </Badge>
-              )}
-            </SheetDescription>
+            <SheetDescription></SheetDescription>
           </SheetHeader>
 
           {isLoading ? (
@@ -468,6 +237,14 @@ export function ObjectDetailsSheet({
                         />
                       </div>
                     </div>
+                    {object?.parents && object?.parents.length && (
+                      <div>
+                        <div className="text-sm font-medium">Parent UUID</div>
+                        <div className="text-sm text-muted-foreground">
+                          {object?.parents[0]}
+                        </div>
+                      </div>
+                    )}
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <div className="text-sm font-medium">Name</div>
@@ -496,54 +273,16 @@ export function ObjectDetailsSheet({
                       <div>
                         <div className="text-sm font-medium">Created</div>
                         <div className="text-sm text-muted-foreground">
-                          {object?.createdAt &&
-                            new Date(object.createdAt).toLocaleString()}
+                          {created}
                         </div>
                       </div>
-                      {object?.lastUpdatedAt && (
+                      {updated && (
                         <div>
                           <div className="text-sm font-medium">Updated</div>
                           <div className="text-sm text-muted-foreground">
-                            {new Date(object.lastUpdatedAt).toLocaleString()}
+                            {updated}
                           </div>
                         </div>
-                      )}
-
-                      {/* Display soft delete metadata if object is deleted */}
-                      {object?.softDeleted && isDeleted && (
-                        <>
-                          {object?.softDeletedAt && (
-                            <div>
-                              <div className="text-sm font-medium text-destructive">
-                                Deleted At
-                              </div>
-                              <div className="text-sm text-muted-foreground">
-                                {object?.softDeletedAt &&
-                                  new Date(
-                                    object.softDeletedAt
-                                  ).toLocaleString()}
-                              </div>
-                            </div>
-                          )}
-                          {object?.softDeleteBy && (
-                            <div>
-                              <div className="text-sm font-medium text-destructive">
-                                Deleted By
-                              </div>
-                              <div
-                                className="text-sm text-muted-foreground font-mono"
-                                title={object.softDeleteBy}
-                                aria-label={object.softDeleteBy}
-                              >
-                                {object.softDeleteBy.length > 30
-                                  ? object.softDeleteBy.substring(
-                                      object.softDeleteBy.length - 30
-                                    ) + '...'
-                                  : object.softDeleteBy}
-                              </div>
-                            </div>
-                          )}
-                        </>
                       )}
                     </div>
                     {object?.description && (
@@ -572,6 +311,36 @@ export function ObjectDetailsSheet({
                             object.description
                           )}
                         </div>
+                      </div>
+                    )}
+
+                    {/* Display soft delete metadata if object is deleted */}
+                    {softDeleteInfo && (
+                      <div className="grid grid-cols-2 gap-3">
+                        {softDeleteInfo.deletedAt && (
+                          <div>
+                            <div className="text-sm font-medium text-destructive">
+                              Deleted At
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {softDeleteInfo.deletedAt}
+                            </div>
+                          </div>
+                        )}
+                        {softDeleteInfo.deletedBy && (
+                          <div>
+                            <div className="text-sm font-medium text-destructive">
+                              Deleted By
+                            </div>
+                            <div
+                              className="text-sm text-muted-foreground font-mono"
+                              title={softDeleteInfo.deletedBy}
+                              aria-label={softDeleteInfo.deletedBy}
+                            >
+                              {formatFingerprint(softDeleteInfo.deletedBy)}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -770,49 +539,140 @@ export function ObjectDetailsSheet({
                 )}
               />
 
-              {/* Model Section (if applicable) */}
-              {model && (
-                <>
-                  <Separator />
+              {/* Address Section */}
+              <Separator />
+              <EditableSection
+                title="Address"
+                isEditing={isAddressEditing}
+                onEditToggle={(isEditing) =>
+                  handleEditToggle('address', isEditing)
+                }
+                onSave={handleSaveAddress}
+                successMessage="Address updated successfully"
+                showToast={false}
+                renderDisplay={() => (
                   <div>
-                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                      Model Details
-                    </h3>
-                    <div className="space-y-2 bg-primary/5 rounded-md p-3">
-                      <div className="grid grid-cols-3 gap-2 py-1 border-b border-muted/40 last:border-0">
-                        <div className="font-medium text-sm">Name</div>
-                        <div className="col-span-2 text-sm">{model.name}</div>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2 py-1 border-b border-muted/40 last:border-0">
-                        <div className="font-medium text-sm">Abbreviation</div>
-                        <div className="col-span-2 text-sm">
-                          {model.abbreviation || 'N/A'}
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2 py-1 border-b border-muted/40 last:border-0">
-                        <div className="font-medium text-sm">Version</div>
-                        <div className="col-span-2 text-sm">
-                          {model.version || 'N/A'}
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2 py-1 border-b border-muted/40 last:border-0">
-                        <div className="font-medium text-sm">Description</div>
-                        <div className="col-span-2 text-sm">
-                          {model.description || 'No description'}
-                        </div>
-                      </div>
-                      {model.creator && (
-                        <div className="grid grid-cols-3 gap-2 py-1 border-b border-muted/40 last:border-0">
-                          <div className="font-medium text-sm">Created By</div>
-                          <div className="col-span-2 text-sm">
-                            {model.creator}
+                    {addressData.fullAddress ? (
+                      <div className="space-y-2">
+                        <div className="flex items-start gap-2">
+                          <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                          <div className="text-sm">
+                            {addressData.fullAddress}
                           </div>
                         </div>
-                      )}
-                    </div>
+
+                        <div className="ml-6 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                          <div className="space-y-1">
+                            {addressData.street && (
+                              <div>Street: {addressData.street}</div>
+                            )}
+                            {addressData.houseNumber && (
+                              <div>House Number: {addressData.houseNumber}</div>
+                            )}
+                            {addressData.city && (
+                              <div>City: {addressData.city}</div>
+                            )}
+                          </div>
+                          <div className="space-y-1">
+                            {addressData.postalCode && (
+                              <div>Postal Code: {addressData.postalCode}</div>
+                            )}
+                            {addressData.country && (
+                              <div>Country: {addressData.country}</div>
+                            )}
+                            {addressData.state && (
+                              <div>State: {addressData.state}</div>
+                            )}
+                            {addressData.district && (
+                              <div>District: {addressData.district}</div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-sm text-muted-foreground bg-muted/20 rounded-md p-3">
+                        No address specified for this object
+                      </div>
+                    )}
                   </div>
-                </>
-              )}
+                )}
+                renderEdit={() => (
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="address-search">Building Address</Label>
+                      <HereAddressAutocomplete
+                        value={editedAddressData.fullAddress}
+                        placeholder="Search for building address..."
+                        onAddressSelect={(fullAddress, components) => {
+                          setEditedAddressData({
+                            fullAddress,
+                            street: components?.street,
+                            houseNumber: components?.houseNumber,
+                            city: components?.city,
+                            postalCode: components?.postalCode,
+                            country: components?.country,
+                            state: components?.state,
+                            district: '', // API has district but HERE API doesn't provide it
+                          })
+                        }}
+                        className="mt-1"
+                      />
+                    </div>
+
+                    {(editedAddressData.street ||
+                      editedAddressData.city ||
+                      editedAddressData.country) && (
+                      <div className="p-3 bg-muted/20 rounded-md">
+                        <div className="text-sm font-medium mb-2">
+                          Address Components:
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          {editedAddressData.street && (
+                            <div>
+                              <strong>Street:</strong>{' '}
+                              {editedAddressData.street}
+                            </div>
+                          )}
+                          {editedAddressData.houseNumber && (
+                            <div>
+                              <strong>Number:</strong>{' '}
+                              {editedAddressData.houseNumber}
+                            </div>
+                          )}
+                          {editedAddressData.city && (
+                            <div>
+                              <strong>City:</strong> {editedAddressData.city}
+                            </div>
+                          )}
+                          {editedAddressData.postalCode && (
+                            <div>
+                              <strong>Postal Code:</strong>{' '}
+                              {editedAddressData.postalCode}
+                            </div>
+                          )}
+                          {editedAddressData.country && (
+                            <div>
+                              <strong>Country:</strong>{' '}
+                              {editedAddressData.country}
+                            </div>
+                          )}
+                          {editedAddressData.state && (
+                            <div>
+                              <strong>State:</strong> {editedAddressData.state}
+                            </div>
+                          )}
+                          {editedAddressData.district && (
+                            <div>
+                              <strong>District:</strong>{' '}
+                              {editedAddressData.district}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              />
 
               {/* Object History Section */}
               {objectHistory && objectHistory.length > 0 && (
@@ -892,7 +752,8 @@ export function ObjectDetailsSheet({
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => handleDeleteObject(object.uuid)}
+                  onClick={() => handleDeleteObject(object.uuid, object.name)}
+                  disabled={isDeleting}
                   className="text-destructive w-full"
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
@@ -903,6 +764,16 @@ export function ObjectDetailsSheet({
           </SheetFooter>
         </SheetContent>
       </Sheet>
+
+      {/* Unified Delete Confirmation Dialog */}
+      {isDeleteModalOpen && objectToDelete && (
+        <DeleteConfirmationDialog
+          open={isDeleteModalOpen}
+          onOpenChange={handleDeleteCancel}
+          objectName={objectToDelete.name}
+          onDelete={handleDeleteConfirm}
+        />
+      )}
     </>
   )
 }

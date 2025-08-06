@@ -1,135 +1,162 @@
 'use client'
 
-import React, { createContext, useContext, useState, useEffect } from 'react'
-import { validate as uuidValidate } from 'uuid'
+import React, { createContext, useContext, useState } from 'react'
 
 import { useCommonApi } from '@/hooks/api/useCommonApi'
-
-interface SearchResult {
-  id: string
-  type: string
-  name: string
-  path?: string
-  properties?: Record<string, any>
-  description?: string
-  metadata?: Record<string, any>
-  createdAt?: string
-  updatedAt?: string
-}
-
-interface RecentSearch {
-  query: string
-  timestamp: number
-}
 
 interface SearchContextType {
   searchQuery: string
   setSearchQuery: (query: string) => void
-  searchResults: SearchResult[]
   isSearching: boolean
-  executeSearch: (query: string) => void
-  recentSearches: RecentSearch[]
-  clearRecentSearches: () => void
+  // New search mode functionality
+  isSearchMode: boolean
+  searchViewResults: any[]
+  searchPagination: {
+    currentPage: number
+    totalPages: number
+    totalElements: number
+    pageSize: number
+    isFirstPage: boolean
+    isLastPage: boolean
+    handlePageChange: (page: number) => void
+    handleFirst: () => void
+    handlePrevious: () => void
+    handleNext: () => void
+    handleLast: () => void
+  } | null
+  executeSearchInView: (query: string) => Promise<void>
+  clearSearch: () => void
 }
 
 const SearchContext = createContext<SearchContextType | undefined>(undefined)
 
 const MIN_SEARCH_CHARS = 2
-const MAX_RECENT_SEARCHES = 5
-const RECENT_SEARCHES_KEY = 'iob-recent-searches'
 
 export function SearchProvider({ children }: { children: React.ReactNode }) {
   const [searchQuery, setSearchQuery] = useState('')
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
   const [isSearching, setIsSearching] = useState(false)
-  const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([])
+  const [searchPageSize] = useState(15) // Fixed page size for search
+  const [isSearchMode, setIsSearchMode] = useState(false)
+  const [searchViewResults, setSearchViewResults] = useState<any[]>([])
+  const [searchCurrentPage, setSearchCurrentPage] = useState(0)
+  const [searchPaginationData, setSearchPaginationData] = useState<any>(null)
   const { useSearch } = useCommonApi()
   const searchMutation = useSearch()
 
-  // Load recent searches from localStorage on initial render
-  useEffect(() => {
-    try {
-      const storedSearches = localStorage.getItem(RECENT_SEARCHES_KEY)
-      if (storedSearches) {
-        const parsedSearches = JSON.parse(storedSearches) as RecentSearch[]
-        setRecentSearches(parsedSearches)
-      }
-    } catch (error) {
-      console.error('Failed to load recent searches:', error)
-    }
-  }, [])
-
-  const addToRecentSearches = (query: string) => {
-    // Don't add if query is too short or empty
-    if (!query || !uuidValidate(query)) return
-
-    const newRecentSearches = [...recentSearches]
-
-    // Remove if this query already exists
-    const existingIndex = newRecentSearches.findIndex((s) => s.query === query)
-    if (existingIndex !== -1) {
-      newRecentSearches.splice(existingIndex, 1)
-    }
-
-    // Add to the beginning of the array
-    newRecentSearches.unshift({
-      query,
-      timestamp: Date.now(),
-    })
-
-    // Limit the number of recent searches
-    const limitedSearches = newRecentSearches.slice(0, MAX_RECENT_SEARCHES)
-
-    // Update state and localStorage
-    setRecentSearches(limitedSearches)
-    try {
-      localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(limitedSearches))
-    } catch (error) {
-      console.error('Failed to save recent searches:', error)
-    }
-  }
-
-  const clearRecentSearches = () => {
-    setRecentSearches([])
-    try {
-      localStorage.removeItem(RECENT_SEARCHES_KEY)
-    } catch (error) {
-      console.error('Failed to clear recent searches:', error)
-    }
-  }
-
-  const executeSearch = async (query: string) => {
-    // Only search if query is valid uuid
-    if (!query || !uuidValidate(query.trim())) {
-      setSearchResults([])
-      return
-    }
-
+  // Execute search with pagination support
+  const executeSearchWithPagination = async (
+    query: string,
+    page: number = 0
+  ) => {
     setIsSearching(true)
-    const trimmedQuery = query.trim().toLowerCase()
+    const trimmedQuery = query.trim()
 
     try {
-      const results = await searchMutation.mutateAsync(trimmedQuery)
-      if (results && results.length > 0) {
-        const result = results[0]
-        // Transform the result into our SearchResult format
-        const searchResult: SearchResult = {
-          id: result.uuid || result.id || trimmedQuery,
-          type: 'object',
-          name: result.name || 'Unknown Item',
-        }
+      // Search with pagination parameters using proper API hook
+      const results = await searchMutation.mutateAsync({
+        searchTerm: trimmedQuery,
+        size: searchPageSize,
+        page: page,
+      })
 
-        setSearchResults([searchResult])
-        // addToRecentSearches(query)
-      } else {
-        setSearchResults([])
+      if (results) {
+        // Store pagination data
+        setSearchPaginationData(results)
+        setSearchCurrentPage(page)
+
+        if (results.content && results.content.length > 0) {
+          // Transform search results to match view data format
+          const transformedResults = results.content.map((result: any) => ({
+            ...result,
+            hasChildren: result.children && result.children.length > 0,
+            childCount: result.children ? result.children.length : 0,
+          }))
+
+          setSearchViewResults(transformedResults)
+          setIsSearchMode(true)
+        } else {
+          setSearchViewResults([])
+          setIsSearchMode(true)
+        }
       }
     } catch (error) {
-      console.error('Search failed:', error)
-      setSearchResults([])
+      console.error('Search in view failed:', error)
+      setSearchViewResults([])
+      setSearchPaginationData(null)
+      setIsSearchMode(false)
     } finally {
       setIsSearching(false)
     }
+  }
+
+  // New search in view functionality
+  const executeSearchInView = async (query: string) => {
+    if (!query || query.length < MIN_SEARCH_CHARS) {
+      clearSearch()
+      return
+    }
+
+    // Reset to first page when starting new search
+    await executeSearchWithPagination(query, 0)
+  }
+
+  // Pagination handlers
+  const handlePageChange = async (page: number) => {
+    if (searchQuery) {
+      await executeSearchWithPagination(searchQuery, page - 1) // Convert from 1-based to 0-based
+    }
+  }
+
+  const handleFirst = async () => {
+    if (searchQuery) {
+      await executeSearchWithPagination(searchQuery, 0)
+    }
+  }
+
+  const handlePrevious = async () => {
+    if (searchQuery && searchCurrentPage > 0) {
+      await executeSearchWithPagination(searchQuery, searchCurrentPage - 1)
+    }
+  }
+
+  const handleNext = async () => {
+    if (searchQuery && searchPaginationData && !searchPaginationData.last) {
+      await executeSearchWithPagination(searchQuery, searchCurrentPage + 1)
+    }
+  }
+
+  const handleLast = async () => {
+    if (searchQuery && searchPaginationData) {
+      await executeSearchWithPagination(
+        searchQuery,
+        searchPaginationData.totalPages - 1
+      )
+    }
+  }
+
+  // Create search pagination object
+  const searchPagination = searchPaginationData
+    ? {
+        currentPage: searchCurrentPage,
+        totalPages: searchPaginationData.totalPages || 0,
+        totalElements: searchPaginationData.totalElements || 0,
+        pageSize: searchPageSize,
+        isFirstPage: searchPaginationData.first || false,
+        isLastPage: searchPaginationData.last || false,
+        handlePageChange,
+        handleFirst,
+        handlePrevious,
+        handleNext,
+        handleLast,
+      }
+    : null
+
+  const clearSearch = () => {
+    setSearchQuery('')
+    setSearchViewResults([])
+    setSearchPaginationData(null)
+    setSearchCurrentPage(0)
+    setIsSearchMode(false)
   }
 
   return (
@@ -137,11 +164,13 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
       value={{
         searchQuery,
         setSearchQuery,
-        searchResults,
         isSearching,
-        executeSearch,
-        recentSearches,
-        clearRecentSearches,
+        // New search mode functionality
+        isSearchMode,
+        searchViewResults,
+        searchPagination,
+        executeSearchInView,
+        clearSearch,
       }}
     >
       {children}

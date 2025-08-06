@@ -1,5 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 import { useIobClient } from '@/providers/query-provider'
+import { AggregateEntity, AggregateFindDTO } from 'iob-client'
 
 export function useCommonApi() {
   const client = useIobClient()
@@ -22,11 +23,11 @@ export function useCommonApi() {
     })
   }
 
-  // Search for a UUID
+  // Search for objects by text or UUID with pagination support
   const useSearch = () => {
     return useMutation({
-      mutationFn: async (uuid: string) => {
-        const response = await client.aggregate.findByUUID(uuid)
+      mutationFn: async (params: AggregateFindDTO) => {
+        const response = await client.aggregate.getAggregateEntities(params)
         return response.data
       },
     })

@@ -1,93 +1,105 @@
 'use client'
 
-import { Loader2 } from 'lucide-react'
-
-import { ViewType } from '@/components/view-selector'
+import { ViewData } from '@/hooks'
 import { ObjectsTable } from '@/components/tables'
-import { ObjectExplorer } from './object-explorer'
-
-interface PaginationInfo {
-  currentPage: number
-  totalPages: number
-  totalElements: number
-  pageSize: number
-  isFirstPage: boolean
-  isLastPage: boolean
-}
+import { ViewType } from '@/components/view-selector'
+import { ObjectColumnsView } from './columns-view'
 
 interface ObjectViewContainerProps {
   viewType: ViewType
-  data: any[]
-  availableModels: any[]
-  loading?: boolean
+  viewData: ViewData
   onViewObject?: (object: any) => void
   onEditObject?: (object: any) => void
-  onSaveObject?: (object: any) => void
-  pagination?: PaginationInfo
+  onObjectDoubleClick?: (object: any) => void
 }
 
 export function ObjectViewContainer({
   viewType,
-  data,
-  availableModels,
-  loading = false,
+  viewData,
   onViewObject,
   onEditObject,
-  onSaveObject,
-  pagination,
+  onObjectDoubleClick,
 }: ObjectViewContainerProps) {
-  // Show loading state
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <span className="ml-2 text-muted-foreground">Loading objects...</span>
-      </div>
-    )
-  }
-
-  // Render the appropriate view based on viewType
   switch (viewType) {
-    case 'table':
+    case 'table': {
+      if (viewData.type !== 'table') {
+        console.error('Expected table data but received:', viewData.type)
+        return null
+      }
+
       return (
         <ObjectsTable
-          initialData={data}
-          availableModels={availableModels}
+          initialData={viewData.data}
+          fetching={viewData.fetching}
           onViewObject={onViewObject}
-          pagination={pagination}
+          onObjectDoubleClick={onObjectDoubleClick}
+          pagination={{
+            currentPage: viewData.pagination.currentPage + 1,
+            totalPages: viewData.pagination.totalPages,
+            totalElements: viewData.pagination.totalElements,
+            pageSize: viewData.pagination.pageSize,
+            isFirstPage: viewData.pagination.isFirstPage,
+            isLastPage: viewData.pagination.isLastPage,
+          }}
+          onPageChange={viewData.pagination.handlePageChange}
+          onFirstPage={viewData.pagination.handleFirst}
+          onPreviousPage={viewData.pagination.handlePrevious}
+          onNextPage={viewData.pagination.handleNext}
+          onLastPage={viewData.pagination.handleLast}
         />
       )
+    }
 
-    case 'explorer':
+    case 'columns': {
+      if (viewData.type !== 'columns') {
+        console.error('Expected columns data but received:', viewData.type)
+        return null
+      }
+
       return (
-        <ObjectExplorer
-          data={data}
-          availableModels={availableModels}
-          pagination={pagination}
-        />
-      )
-
-    // case 'columns':
-    //   return (
-    //     <ObjectColumnsView
-    //       data={data}
-    //       availableModels={availableModels}
-    //       onViewObject={onViewObject}
-    //       onEditObject={onEditObject}
-    //       onSaveObject={onSaveObject}
-    //     />
-    //   )
-
-    default:
-      return (
-        <ObjectsTable
-          initialData={data}
-          availableModels={availableModels}
+        <ObjectColumnsView
+          data={viewData.rootObjects}
+          loading={viewData.loading}
+          fetching={viewData.fetching}
+          loadChildren={viewData.loadChildren}
+          rootPagination={viewData.rootPagination}
           onViewObject={onViewObject}
           onEditObject={onEditObject}
-          onSaveObject={onSaveObject}
-          pagination={pagination}
         />
       )
+    }
+
+    default: {
+      // Default to table view
+      if (viewData.type !== 'table') {
+        console.error(
+          'Expected table data for default case but received:',
+          viewData.type
+        )
+        return null
+      }
+
+      return (
+        <ObjectsTable
+          initialData={viewData.data}
+          fetching={viewData.fetching} // Pass fetching state for internal loading
+          onViewObject={onViewObject}
+          onObjectDoubleClick={onObjectDoubleClick}
+          pagination={{
+            currentPage: viewData.pagination.currentPage + 1, // Convert to 1-based for display
+            totalPages: viewData.pagination.totalPages,
+            totalElements: viewData.pagination.totalElements,
+            pageSize: viewData.pagination.pageSize,
+            isFirstPage: viewData.pagination.isFirstPage,
+            isLastPage: viewData.pagination.isLastPage,
+          }}
+          onPageChange={viewData.pagination.handlePageChange}
+          onFirstPage={viewData.pagination.handleFirst}
+          onPreviousPage={viewData.pagination.handlePrevious}
+          onNextPage={viewData.pagination.handleNext}
+          onLastPage={viewData.pagination.handleLast}
+        />
+      )
+    }
   }
 }

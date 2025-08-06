@@ -1,0 +1,12 @@
+# Ignore all certificate files for security
+*.crt
+*.key
+*.pem
+*.p12
+*.pfx
+*.cer
+*.der
+
+# Keep only documentation
+!README.md
+!.gitignore 
