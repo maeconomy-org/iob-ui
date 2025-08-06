@@ -1,10 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Plus, Loader2 } from 'lucide-react'
+import { useEffect } from 'react'
+import { Plus } from 'lucide-react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm, useFieldArray } from 'react-hook-form'
-import { toast } from 'sonner'
 
 import {
   Input,
@@ -25,29 +24,28 @@ import {
   SheetFooter,
 } from '@/components/ui'
 import { PropertyField } from '@/components/forms'
-import {
-  objectSchema,
-  ObjectFormValues,
-  Property,
-} from '@/lib/validations/object-model'
+import { objectSchema, ObjectFormValues } from '@/lib/validations/object-model'
+import { HereAddressAutocomplete } from '@/components/ui'
+import { useObjectOperations } from '../hooks/useObjectOperations'
+
+// Import utilities
+import { createEmptyProperty } from '../utils'
 
 interface ObjectAddSheetProps {
   isOpen: boolean
   onClose: () => void
-  availableModels: any[]
-  availableObjects?: any[]
   onSave?: (object: any) => void
 }
 
 export function ObjectAddSheet({
   isOpen,
   onClose,
-  availableModels = [],
-  availableObjects = [],
   onSave,
 }: ObjectAddSheetProps) {
-  // Whether any operation is currently loading
-  const [isLoading, setIsLoading] = useState(false)
+  const { createObject, isCreating } = useObjectOperations({
+    isEditing: false,
+    onRefetch: onSave ? () => onSave({}) : undefined, // Wrap onSave to match signature
+  })
 
   const form = useForm<ObjectFormValues>({
     resolver: zodResolver(objectSchema),
@@ -56,10 +54,11 @@ export function ObjectAddSheet({
       abbreviation: '',
       version: '',
       description: '',
+      address: undefined,
       parentUuid: undefined,
       properties: [],
       files: [],
-      modelUuid: '',
+      modelUuid: undefined,
     },
   })
 
@@ -67,6 +66,9 @@ export function ObjectAddSheet({
     control: form.control,
     name: 'properties',
   })
+
+  // Watch address field for display
+  const watchedAddress = form.watch('address')
 
   // Reset form when sheet opens
   useEffect(() => {
@@ -79,82 +81,18 @@ export function ObjectAddSheet({
         parentUuid: undefined,
         properties: [],
         files: [],
-        modelUuid: '',
+        modelUuid: undefined,
       })
     }
   }, [isOpen, form])
 
-  const createEmptyProperty = (): Property => {
-    return {
-      uuid: '',
-      key: '',
-      values: [
-        {
-          uuid: '',
-          value: '',
-          files: [],
-        },
-      ],
-      files: [],
-    }
-  }
-
   const handleSubmit = async (values: ObjectFormValues) => {
-    try {
-      setIsLoading(true)
-      if (onSave) {
-        onSave(values)
-      }
+    const success = await createObject(values)
 
+    if (success) {
       onClose()
       form.reset()
-    } catch (error: any) {
-      console.error('Error creating object:', error)
-      toast.error(error.message || 'Failed to create object')
-    } finally {
-      setIsLoading(false)
     }
-  }
-
-  const handleModelSelect = (modelUuid: string) => {
-    if (modelUuid === '_none') {
-      form.setValue('modelUuid', '')
-      return
-    }
-
-    const selectedModel = availableModels.find((m) => m.uuid === modelUuid)
-    if (!selectedModel) return
-
-    // Deep clone the model properties to avoid reference issues
-    const clonedProperties = JSON.parse(
-      JSON.stringify(selectedModel.properties || [])
-    )
-
-    // Generate new UUIDs for the cloned properties
-    const newProperties = clonedProperties.map((prop: any) => {
-      const newProp = {
-        ...prop,
-        uuid: '',
-        values: (prop.values || [{ value: prop.value || '' }]).map(
-          (val: any) => ({
-            ...val,
-            uuid: '',
-          })
-        ),
-      }
-      return newProp
-    })
-
-    // Update the form with model data
-    form.reset({
-      ...form.getValues(),
-      name: selectedModel.name,
-      abbreviation: selectedModel.abbreviation || '',
-      version: selectedModel.version || '',
-      description: selectedModel.description || '',
-      properties: newProperties.length > 0 ? newProperties : [],
-      modelUuid: selectedModel.uuid,
-    })
   }
 
   const addProperty = () => {
@@ -241,6 +179,61 @@ export function ObjectAddSheet({
                 )}
               />
 
+              <div className="grid grid-cols-1 gap-4">
+                <FormField
+                  control={form.control}
+                  name="parentUuid"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Parent UUID</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Enter parent object UUID (optional)"
+                          value={field.value || ''}
+                          onChange={(e) => {
+                            const value = e.target.value
+                            field.onChange(value === '' ? undefined : value)
+                          }}
+                          onBlur={field.onBlur}
+                          name={field.name}
+                          ref={field.ref}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <Separator />
+
+              {/* Address Section */}
+              <div className="space-y-4">
+                <FormLabel>Address</FormLabel>
+
+                <HereAddressAutocomplete
+                  value={watchedAddress?.fullAddress || ''}
+                  placeholder="Search for building address..."
+                  onAddressSelect={(fullAddress, components) => {
+                    form.setValue('address', { fullAddress, components })
+                  }}
+                />
+
+                {watchedAddress?.components && (
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-sm text-muted-foreground">
+                    <div>
+                      📍 {watchedAddress.components.street}{' '}
+                      {watchedAddress.components.houseNumber}
+                    </div>
+                    <div>
+                      🏘️ {watchedAddress.components.city},{' '}
+                      {watchedAddress.components.postalCode},{' '}
+                      {watchedAddress.components.country}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <Separator />
 
               <div className="space-y-2">
@@ -296,12 +289,12 @@ export function ObjectAddSheet({
                   type="button"
                   variant="outline"
                   onClick={onClose}
-                  disabled={isLoading}
+                  disabled={isCreating}
                 >
                   Cancel
                 </Button>
-                <Button className="w-full" type="submit" disabled={isLoading}>
-                  {isLoading ? (
+                <Button className="w-full" type="submit" disabled={isCreating}>
+                  {isCreating ? (
                     <>
                       <span className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-background border-t-transparent"></span>
                       Creating...

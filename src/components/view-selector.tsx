@@ -1,6 +1,5 @@
 'use client'
 
-import { useEffect } from 'react'
 import { Table, Columns, List } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
@@ -12,7 +11,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 
-export type ViewType = 'table' | 'explorer' | 'columns'
+export type ViewType = 'table' | 'columns'
 
 interface ViewSelectorProps {
   view: ViewType
@@ -44,7 +43,7 @@ export function ViewSelector({ view, onChange }: ViewSelectorProps) {
           <TooltipContent side="bottom">Table View</TooltipContent>
         </Tooltip>
 
-        <Tooltip>
+        {/* <Tooltip>
           <TooltipTrigger
             className={cn('hover:bg-muted', view === 'explorer' && 'bg-muted')}
             asChild
@@ -54,9 +53,9 @@ export function ViewSelector({ view, onChange }: ViewSelectorProps) {
             </ToggleGroupItem>
           </TooltipTrigger>
           <TooltipContent side="bottom">Explorer View</TooltipContent>
-        </Tooltip>
+        </Tooltip> */}
 
-        {/* <Tooltip>
+        <Tooltip>
           <TooltipTrigger
             className={cn('hover:bg-muted', view === 'columns' && 'bg-muted')}
             asChild
@@ -66,7 +65,7 @@ export function ViewSelector({ view, onChange }: ViewSelectorProps) {
             </ToggleGroupItem>
           </TooltipTrigger>
           <TooltipContent side="bottom">Columns View</TooltipContent>
-        </Tooltip> */}
+        </Tooltip>
       </ToggleGroup>
     </TooltipProvider>
   )

@@ -1,5 +1,10 @@
 import { API_CONFIG } from '@/lib/api-config'
 import redis from '@/lib/redis'
+import {
+  createCertificateAgent,
+  getCertificateInfo,
+} from '@/lib/certificate-utils'
+import axios from 'axios'
 
 export async function processImportJob(jobId: string) {
   try {
@@ -23,7 +28,45 @@ export async function processImportJob(jobId: string) {
     // Get the request delay from environment or use default (100ms)
     const requestDelay = parseInt(process.env.API_REQUEST_DELAY || '100')
 
-    // Collect all objects first from all chunks to process them one by one
+    // Get batch size from environment or use default (50)
+    const batchSize = parseInt(process.env.API_BATCH_SIZE || '50')
+
+    // Get user fingerprint from job data (should be set when job is created)
+    const userFingerprint = jobData.userFingerprint || 'defaultFingerprint'
+
+    // Determine certificate verification behavior
+    const shouldVerifyCerts =
+      process.env.VERIFY_CERTIFICATES === 'true' ||
+      process.env.NODE_ENV === 'production'
+
+    // Set up HTTPS agent with client certificates using utility
+    const httpsAgent = createCertificateAgent({
+      password: process.env.CERTIFICATE_PASSWORD, // Get password from environment variables
+      rejectUnauthorized: shouldVerifyCerts, // Controlled by environment
+      fallbackToInsecure: true,
+    })
+
+    // Debug certificate info
+    console.log(`Job ${jobId}: Starting import with ${userFingerprint}`)
+
+    // Test certificate availability
+    const certInfo = getCertificateInfo()
+    if (!certInfo) {
+      console.warn('No certificate found - using fallback agent')
+    }
+
+    // Create axios instance with certificate configuration
+    const axiosInstance = axios.create({
+      httpsAgent: httpsAgent,
+      timeout: 120000, // Increase to 2 minutes for large batches
+      headers: {
+        'Content-Type': 'application/json',
+        createdBy: userFingerprint,
+        'User-Fingerprint': userFingerprint,
+      },
+    })
+
+    // Collect all objects first from all chunks to process them in batches
     const allObjects = []
 
     // Get objects from all chunks
@@ -42,62 +85,118 @@ export async function processImportJob(jobId: string) {
     }
 
     console.log(
-      `Job ${jobId}: Processing ${allObjects.length} objects individually`
+      `Job ${jobId}: Processing ${allObjects.length} objects in batches of ${batchSize}`
     )
 
-    // Process each object one by one
-    for (let i = 0; i < allObjects.length; i++) {
-      const object = allObjects[i]
+    // Process objects in batches
+    for (let i = 0; i < allObjects.length; i += batchSize) {
+      const batch = allObjects.slice(i, i + batchSize)
 
       try {
-        // Send to Java backend API
-        // const response = await fetch(`${API_CONFIG.baseUrl}/api/Import`, {
-        //   method: 'POST',
-        //   headers: {
-        //     'Content-Type': 'application/json',
-        //   },
-        //   body: JSON.stringify(object),
-        // })
+        // Send batch to Java backend API using axios
+        const response = await axiosInstance.post(
+          `${API_CONFIG.baseUrl}/api/Aggregate/Import`,
+          batch
+        )
 
-        // console.log(response)
+        console.log(
+          `Batch ${Math.floor(i / batchSize) + 1} response:`,
+          response.status
+        )
 
-        // if (!response.ok) {
-        //   throw new Error(`API responded with status ${response.status}`)
-        // }
-
-        // Increment processed count
-        processed++
-
-        // Update progress for each object or every 10 objects
-        if (processed % 10 === 0 || processed === total) {
-          await redis.hset(`import:${jobId}`, {
-            processed: processed.toString(),
-          })
+        if (response.status < 200 || response.status >= 300) {
+          throw new Error(`API responded with status ${response.status}`)
         }
-      } catch (error) {
-        console.error(`Error processing object ${i}:`, error)
 
-        // Record failure
-        failed++
+        // Increment processed count by batch size
+        processed += batch.length
+
+        // Update progress after each batch
         await redis.hset(`import:${jobId}`, {
-          failed: failed.toString(),
+          processed: processed.toString(),
         })
 
-        // Store failure details
-        await redis.rpush(
-          `import:${jobId}:failures`,
-          JSON.stringify({
-            index: i,
-            object: object,
-            error: error instanceof Error ? error.message : String(error),
-            timestamp: Date.now(),
-          })
+        console.log(
+          `Processed batch ${Math.floor(i / batchSize) + 1}: ${batch.length} objects`
         )
+      } catch (error) {
+        console.error(
+          `Error processing batch ${Math.floor(i / batchSize) + 1}:`,
+          error
+        )
+
+        let shouldMarkAsFailed = true
+        let errorMessage = 'Unknown error'
+
+        // Check for different types of errors
+        if (axios.isAxiosError(error)) {
+          errorMessage =
+            error.response?.data?.message || error.message || 'Unknown error'
+
+          if (
+            error.code === 'ECONNABORTED' &&
+            error.message.includes('timeout')
+          ) {
+            console.warn(
+              `⚠️  Batch ${Math.floor(i / batchSize) + 1} timed out - objects may have been created on server despite timeout`
+            )
+            console.warn(
+              '⚠️  Consider checking the server or increasing timeout if this happens frequently'
+            )
+            // For timeouts, we'll still mark as failed but note it might have succeeded
+          } else if (
+            errorMessage.includes('UNABLE_TO_VERIFY_LEAF_SIGNATURE') ||
+            errorMessage.includes('certificate')
+          ) {
+            console.error(
+              'Certificate error - check certificate and private key files'
+            )
+          }
+
+          console.error('Error details:', {
+            message: errorMessage,
+            code: error.code,
+            status: error.response?.status,
+            statusText: error.response?.statusText,
+          })
+        } else if (error instanceof Error) {
+          console.error('Non-HTTP error:', error.message)
+          errorMessage = error.message
+        } else {
+          console.error('Unknown error type:', error)
+          errorMessage = String(error)
+        }
+
+        // Record failure for the entire batch (but note timeout caveat above)
+        if (shouldMarkAsFailed) {
+          failed += batch.length
+          await redis.hset(`import:${jobId}`, {
+            failed: failed.toString(),
+          })
+
+          // Store failure details for each object in the batch
+          for (let j = 0; j < batch.length; j++) {
+            await redis.rpush(
+              `import:${jobId}:failures`,
+              JSON.stringify({
+                index: i + j,
+                object: batch[j],
+                error: errorMessage,
+                errorType: axios.isAxiosError(error)
+                  ? error.code || 'HTTP_ERROR'
+                  : 'UNKNOWN_ERROR',
+                timestamp: Date.now(),
+              })
+            )
+          }
+        }
       }
 
-      // Add a configurable delay between requests to avoid overwhelming the API
-      // This can be adjusted via environment variable
-      await new Promise((resolve) => setTimeout(resolve, requestDelay))
+      // Add a configurable delay between batch requests to avoid overwhelming the API
+      if (i + batchSize < allObjects.length) {
+        // Don't delay after the last batch
+        await new Promise((resolve) => setTimeout(resolve, requestDelay))
+      }
     }
 
     // Delete all chunks after processing to save memory

@@ -13,6 +13,19 @@ export const propertySchema = z.object({
   files: z.array(z.any()),
 })
 
+export const addressSchema = z.object({
+  fullAddress: z.string().min(1, 'Full address is required'),
+  components: z.object({
+    street: z.string().optional(),
+    houseNumber: z.string().optional(),
+    city: z.string().optional(),
+    postalCode: z.string().optional(),
+    country: z.string().optional(),
+    state: z.string().optional(),
+    district: z.string().optional(),
+  }),
+})
+
 export const objectModelSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   abbreviation: z.string().min(1, 'Abbreviation is required'),
@@ -27,6 +40,7 @@ export const objectSchema = z.object({
   abbreviation: z.string().optional(),
   version: z.string().optional(),
   description: z.string().optional(),
+  address: addressSchema.optional(),
   parentUuid: z.string().optional(),
   properties: z.array(propertySchema),
   files: z.array(z.any()).optional(),

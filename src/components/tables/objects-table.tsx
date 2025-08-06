@@ -1,9 +1,8 @@
 'use client'
 
 import { MouseEvent, useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import { FileText, Trash2, QrCode } from 'lucide-react'
-import { toast } from 'sonner'
+import { useRouter } from 'next/navigation'
 
 import {
   Button,
@@ -14,18 +13,19 @@ import {
   TableHeader,
   TableRow,
   CopyButton,
+  TablePagination,
 } from '@/components/ui'
-import { useObjects } from '@/hooks'
+import { cn } from '@/lib/utils'
 import { objectsData } from '@/lib/data'
 import { QRCodeModal, DeleteConfirmationDialog } from '@/components/modals'
+import { useUnifiedDelete } from '@/hooks'
 
 interface ObjectsTableProps {
   initialData?: any[]
   showParentLink?: boolean
-  availableModels?: any[]
+  fetching?: boolean // Loading state for pagination/refresh
   onViewObject?: (object: any) => void
-  onEditObject?: (object: any) => void
-  onSaveObject?: (object: any) => void
+  onObjectDoubleClick?: (object: any) => void
   pagination?: {
     currentPage: number
     totalPages: number
@@ -34,6 +34,11 @@ interface ObjectsTableProps {
     isFirstPage: boolean
     isLastPage: boolean
   }
+  onPageChange?: (page: number) => void
+  onFirstPage?: () => void
+  onPreviousPage?: () => void
+  onNextPage?: () => void
+  onLastPage?: () => void
 }
 
 const isObjectDeleted = (object: any) => {
@@ -44,21 +49,33 @@ const isObjectDeleted = (object: any) => {
 export function ObjectsTable({
   initialData,
   showParentLink = true,
+  fetching = false,
   onViewObject,
+  onObjectDoubleClick,
   pagination,
+  onPageChange,
+  onFirstPage,
+  onPreviousPage,
+  onNextPage,
+  onLastPage,
 }: ObjectsTableProps) {
   const router = useRouter()
   const [data, setData] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({})
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
-  const [objectToDelete, setObjectToDelete] = useState<any>(null)
+
   const [isQRCodeModalOpen, setIsQRCodeModalOpen] = useState(false)
   const [selectedQRObject, setSelectedQRObject] = useState<any>(null)
 
-  // Get the delete mutation
-  const { useDeleteObject } = useObjects()
-  const { mutateAsync: deleteObject } = useDeleteObject()
+  // Unified delete hook
+  const {
+    isDeleteModalOpen,
+    objectToDelete,
+    isDeleting,
+    handleDelete,
+    handleDeleteConfirm,
+    handleDeleteCancel,
+  } = useUnifiedDelete()
 
   // Load data from props or from the data file
   useEffect(() => {
@@ -75,44 +92,6 @@ export function ObjectsTable({
       if (object && object.uuid) {
         onViewObject(object)
       }
-    }
-  }
-
-  // Update the delete handler to use the API mutation
-  const handleDeleteConfirm = async (uuid: string) => {
-    try {
-      await deleteObject(uuid)
-      // Show a success toast
-      toast.success('Object deleted successfully')
-
-      // Update the local data to reflect the deletion
-      // This assumes the API doesn't automatically trigger a refetch
-      setData((prev) => {
-        const updateDeleted = (items: any[]): any[] => {
-          return items.map((item) => {
-            if (item.uuid === uuid) {
-              return {
-                ...item,
-                softDeleted: true,
-                softDeletedAt: new Date().toISOString(),
-              }
-            }
-            if (item.children && item.children.length > 0) {
-              return {
-                ...item,
-                children: updateDeleted(item.children),
-              }
-            }
-            return item
-          })
-        }
-        return updateDeleted(prev)
-      })
-
-      setIsDeleteModalOpen(false)
-    } catch (error) {
-      console.error('Error deleting object:', error)
-      toast.error('Failed to delete object')
     }
   }
 
@@ -137,7 +116,13 @@ export function ObjectsTable({
   }
 
   const handleRowDoubleClick = (object: any) => {
-    if (object.children && object.children.length > 0) {
+    if (onObjectDoubleClick) {
+      onObjectDoubleClick(object)
+    } else if (
+      object.hasChildren ||
+      (object.children && object.children.length > 0)
+    ) {
+      // Fallback behavior
       navigateToChildren(object)
     } else {
       handleViewDetails(object)
@@ -150,17 +135,20 @@ export function ObjectsTable({
 
   const renderRows = (objects: any[], level = 0) => {
     return objects.flatMap((object) => {
-      const hasChildren = object.children && object.children.length > 0
-      const isExpanded = expandedRows[object.uuid]
+      const hasChildren =
+        object.hasChildren || (object.children && object.children.length > 0)
+      const childCount =
+        object.childCount || (object.children ? object.children.length : 0)
       const isDeleted = isObjectDeleted(object)
 
       const rows = [
         <TableRow
           key={object.uuid}
           onDoubleClick={() => handleRowDoubleClick(object)}
-          className={`cursor-pointer hover:bg-muted/50 ${
+          className={cn(
+            'cursor-pointer hover:bg-muted/50',
             isDeleted ? 'bg-destructive/10' : ''
-          }`}
+          )}
         >
           <TableCell className="font-medium">
             <div className="flex items-center">
@@ -182,6 +170,18 @@ export function ObjectsTable({
               <span className="truncate flex">{object.uuid}</span>
               <CopyButton text={object.uuid} label="UUID" />
             </div>
+          </TableCell>
+          <TableCell>
+            {hasChildren && (
+              <div className="flex items-center gap-1">
+                <span className="text-sm">{childCount}</span>
+                {hasChildren && (
+                  <span className="text-xs text-muted-foreground">
+                    (double-click)
+                  </span>
+                )}
+              </div>
+            )}
           </TableCell>
           <TableCell>{formatDate(object.createdAt)}</TableCell>
           <TableCell>
@@ -213,9 +213,12 @@ export function ObjectsTable({
                   size="icon"
                   onClick={(e) => {
                     e.stopPropagation()
-                    setObjectToDelete(object)
-                    setIsDeleteModalOpen(true)
+                    handleDelete({
+                      uuid: object.uuid,
+                      name: object.name,
+                    })
                   }}
+                  disabled={isDeleting}
                 >
                   <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>
@@ -225,15 +228,12 @@ export function ObjectsTable({
         </TableRow>,
       ]
 
-      // if (hasChildren && isExpanded) {
-      //   rows.push(...renderRows(object.children, level + 1))
-      // }
-
       return rows
     })
   }
 
-  if (isLoading) {
+  // Only show full loading screen on initial load when there's no data
+  if (isLoading && data.length === 0) {
     return (
       <div className="flex justify-center items-center h-40">Loading...</div>
     )
@@ -247,24 +247,25 @@ export function ObjectsTable({
             <TableRow>
               <TableHead>Name</TableHead>
               <TableHead>UUID</TableHead>
+              <TableHead>Children</TableHead>
               <TableHead>Created</TableHead>
               <TableHead>QR Code</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading ? (
+            {fetching ? (
               <TableRow>
-                <TableCell className="text-center py-8" {...{ colSpan: 5 }}>
+                <TableCell className="text-center py-4" {...{ colSpan: 6 }}>
                   <div className="flex items-center justify-center">
                     <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent mr-2"></div>
-                    Loading objects...
+                    Updating data...
                   </div>
                 </TableCell>
               </TableRow>
             ) : data.length === 0 ? (
               <TableRow>
-                <TableCell className="text-center py-8" {...{ colSpan: 5 }}>
+                <TableCell className="text-center py-8" {...{ colSpan: 6 }}>
                   <div className="flex flex-col items-center">
                     <FileText className="h-10 w-10 text-muted-foreground/50 mb-4" />
                     <h3 className="text-lg font-medium mb-2">
@@ -283,21 +284,21 @@ export function ObjectsTable({
         </Table>
       </div>
 
-      {/* Pagination info footer */}
+      {/* Table Pagination */}
       {pagination && (
-        <div className="flex items-center justify-between px-2 py-4">
-          <div className="text-sm text-muted-foreground">
-            Showing {(pagination.currentPage - 1) * pagination.pageSize + 1}-
-            {Math.min(
-              pagination.currentPage * pagination.pageSize,
-              pagination.totalElements
-            )}{' '}
-            of {pagination.totalElements} objects
-          </div>
-          <div className="text-sm text-muted-foreground">
-            Page {pagination.currentPage} of {pagination.totalPages}
-          </div>
-        </div>
+        <TablePagination
+          currentPage={pagination.currentPage - 1} // Convert to 0-based
+          totalPages={pagination.totalPages}
+          totalElements={pagination.totalElements}
+          pageSize={pagination.pageSize}
+          isFirstPage={pagination.isFirstPage}
+          isLastPage={pagination.isLastPage}
+          onPageChange={(page) => onPageChange?.(page)}
+          onFirst={() => onFirstPage?.()}
+          onPrevious={() => onPreviousPage?.()}
+          onNext={() => onNextPage?.()}
+          onLast={() => onLastPage?.()}
+        />
       )}
 
       {/* QR Code Modal */}
@@ -310,13 +311,13 @@ export function ObjectsTable({
         />
       )}
 
-      {/* Delete Confirmation Dialog */}
+      {/* Unified Delete Confirmation Dialog */}
       {isDeleteModalOpen && objectToDelete && (
         <DeleteConfirmationDialog
           open={isDeleteModalOpen}
-          onOpenChange={setIsDeleteModalOpen}
+          onOpenChange={handleDeleteCancel}
           objectName={objectToDelete.name}
-          onDelete={() => handleDeleteConfirm(objectToDelete.uuid)}
+          onDelete={handleDeleteConfirm}
         />
       )}
     </div>

@@ -1,11 +1,10 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import type { AggregateFindDTO } from 'iob-client'
 
 import { useIobClient } from '@/providers/query-provider'
 
 export function useAggregate() {
   const client = useIobClient()
-  const queryClient = useQueryClient()
 
   // Get aggregate entity by UUID (rich data with all relationships)
   const useAggregateByUUID = (uuid: string, options = {}) => {

@@ -28,8 +28,7 @@ export function DeleteConfirmationDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>Are you sure?</AlertDialogTitle>
           <AlertDialogDescription>
-            This will permanently delete &quot;{objectName}&quot; and cannot be
-            undone.
+            This will soft delete &quot;{objectName}&quot; and cannot be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

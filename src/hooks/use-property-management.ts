@@ -1,17 +1,15 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { Predicate } from 'iob-client'
 import type { UUPropertyDTO, UUPropertyValueDTO } from 'iob-client'
+import { Predicate } from 'iob-client'
 
-import { useIobClient } from '@/providers/query-provider'
 import { useProperties, useStatements } from './api'
 
 /**
  * A hook that provides comprehensive property management functions
  */
 export function usePropertyManagement(objectUuid?: string) {
-  const client = useIobClient()
   const {
     useUpdatePropertyWithValues,
     useAddPropertyToObject,
@@ -147,21 +145,13 @@ export function usePropertyManagement(objectUuid?: string) {
       setError(null)
 
       try {
-        // We need to find the property-object relationship and remove it
-        const statements = await client.statements.getStatements({
+        // Remove the property-object relationship directly
+        // The API will handle checking if the relationship exists
+        await deleteStatementMutation.mutateAsync({
           subject: propertyUuid,
           predicate: Predicate.IS_PROPERTY_OF,
           object: objectId,
         })
-
-        if (statements.data && statements.data.length > 0) {
-          // Remove the relationship
-          await deleteStatementMutation.mutateAsync({
-            subject: propertyUuid,
-            predicate: Predicate.IS_PROPERTY_OF,
-            object: objectId,
-          })
-        }
 
         return { success: true }
       } catch (err) {
@@ -175,7 +165,7 @@ export function usePropertyManagement(objectUuid?: string) {
         setIsLoading(false)
       }
     },
-    [client]
+    [deleteStatementMutation]
   )
 
   return {

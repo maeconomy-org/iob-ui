@@ -3,6 +3,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 
 import { IMPORT_CHUNK_SIZE, SIZE_THRESHOLD_MB } from '@/constants'
+import { useAuth } from '@/contexts/auth-context'
 
 export interface ImportData {
   mappedData: any[]
@@ -32,8 +33,24 @@ export function useImportProcess({
   autoRedirect = true,
 }: UseImportProcessOptions = {}): UseImportProcessResult {
   const router = useRouter()
+  const { certFingerprint } = useAuth()
   const [isImporting, setIsImporting] = useState(false)
   const [importJobId, setImportJobId] = useState<string | null>(null)
+
+  // Get headers with user fingerprint
+  const getHeaders = useCallback(() => {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    }
+
+    // Add user fingerprint if available
+    if (certFingerprint) {
+      headers['User-Fingerprint'] = certFingerprint
+      headers['createdBy'] = certFingerprint
+    }
+
+    return headers
+  }, [certFingerprint])
 
   // Function to start the import
   const startImport = useCallback(
@@ -77,9 +94,7 @@ export function useImportProcess({
           // Standard upload for smaller datasets
           const response = await fetch('/api/import', {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
+            headers: getHeaders(),
             body: JSON.stringify({ objects: mappedData }),
           })
 
@@ -119,93 +134,96 @@ export function useImportProcess({
         return null
       }
     },
-    [autoRedirect, router, onImportStarted, onImportError]
+    [autoRedirect, router, onImportStarted, onImportError, getHeaders]
   )
 
   // Handle chunked upload for large payloads
-  const handleChunkedUpload = useCallback(async (mappedData: any[]) => {
-    try {
-      // Split data into chunks
-      const totalObjects = mappedData.length
-      const totalChunks = Math.ceil(totalObjects / CHUNK_SIZE)
+  const handleChunkedUpload = useCallback(
+    async (mappedData: any[]) => {
+      try {
+        // Split data into chunks
+        const totalObjects = mappedData.length
+        const totalChunks = Math.ceil(totalObjects / CHUNK_SIZE)
 
-      toast.info(`Processing ${totalObjects} objects in ${totalChunks} chunks`)
-
-      let jobId: string | null = null
-
-      // Process each chunk
-      for (let i = 0; i < totalObjects; i += CHUNK_SIZE) {
-        const chunk = mappedData.slice(i, i + CHUNK_SIZE)
-        const chunkIndex = Math.floor(i / CHUNK_SIZE)
-        const chunkPercent = Math.round((chunkIndex / totalChunks) * 100)
-
-        // Update progress toast
-        toast.loading(
-          `Uploading chunk ${chunkIndex + 1}/${totalChunks} (${chunkPercent}%)...`,
-          {
-            id: 'chunk-upload',
-          }
+        toast.info(
+          `Processing ${totalObjects} objects in ${totalChunks} chunks`
         )
 
-        // Send chunk to API
-        const response: Response = await fetch('/api/import/chunk', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            chunk,
-            total: totalObjects,
-            chunkIndex,
-            totalChunks,
-            sessionId: jobId, // Only null for first chunk
-          }),
-        })
+        let jobId: string | null = null
 
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(
-            errorData.error || `Failed to upload chunk ${chunkIndex + 1}`
+        // Process each chunk
+        for (let i = 0; i < totalObjects; i += CHUNK_SIZE) {
+          const chunk = mappedData.slice(i, i + CHUNK_SIZE)
+          const chunkIndex = Math.floor(i / CHUNK_SIZE)
+          const chunkPercent = Math.round((chunkIndex / totalChunks) * 100)
+
+          // Update progress toast
+          toast.loading(
+            `Uploading chunk ${chunkIndex + 1}/${totalChunks} (${chunkPercent}%)...`,
+            {
+              id: 'chunk-upload',
+            }
           )
+
+          // Send chunk to API
+          const response: Response = await fetch('/api/import/chunk', {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({
+              chunk,
+              total: totalObjects,
+              chunkIndex,
+              totalChunks,
+              sessionId: jobId, // Only null for first chunk
+            }),
+          })
+
+          if (!response.ok) {
+            const errorData = await response.json()
+            throw new Error(
+              errorData.error || `Failed to upload chunk ${chunkIndex + 1}`
+            )
+          }
+
+          const data: {
+            jobId: string
+            status: string
+            message: string
+            progress: string
+            complete: boolean
+          } = await response.json()
+
+          // Store job ID from first chunk response
+          if (chunkIndex === 0) {
+            jobId = data.jobId
+            setImportJobId(data.jobId)
+          }
+
+          // Update progress
+          toast.success(`Chunk ${chunkIndex + 1}/${totalChunks} uploaded`, {
+            id: 'chunk-upload',
+          })
+
+          // If all chunks uploaded, show completion message
+          if (data.complete || chunkIndex === totalChunks - 1) {
+            toast.success(
+              `All chunks uploaded (${totalObjects} objects), processing will start automatically`
+            )
+          }
         }
 
-        const data: {
-          jobId: string
-          status: string
-          message: string
-          progress: string
-          complete: boolean
-        } = await response.json()
-
-        // Store job ID from first chunk response
-        if (chunkIndex === 0) {
-          jobId = data.jobId
-          setImportJobId(data.jobId)
-        }
-
-        // Update progress
-        toast.success(`Chunk ${chunkIndex + 1}/${totalChunks} uploaded`, {
-          id: 'chunk-upload',
-        })
-
-        // If all chunks uploaded, show completion message
-        if (data.complete || chunkIndex === totalChunks - 1) {
-          toast.success(
-            `All chunks uploaded (${totalObjects} objects), processing will start automatically`
-          )
-        }
+        return jobId
+      } catch (error) {
+        console.error('Chunked upload error:', error)
+        toast.error(
+          `Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+        )
+        setIsImporting(false)
+        return null
       }
-
-      return jobId
-    } catch (error) {
-      console.error('Chunked upload error:', error)
-      toast.error(
-        `Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-      )
-      setIsImporting(false)
-      return null
-    }
-  }, [])
+    },
+    [getHeaders]
+  )
 
   // Reset the import state
   const resetImport = useCallback(() => {

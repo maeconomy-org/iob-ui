@@ -2,8 +2,9 @@
 
 import { useState, useMemo } from 'react'
 
-import { useObjects } from '@/hooks'
+import { useObjects, useUnifiedDelete } from '@/hooks'
 import { DeleteConfirmationDialog } from '@/components/modals'
+
 import { filterObjectsBySearchTerm } from '@/lib/explorer-view-utils'
 
 import { SearchBar, TreeItem, DetailsPanel } from './explorer-view'
@@ -34,37 +35,21 @@ export function ObjectExplorer({
   const [expandedItems, setExpandedItems] = useState<string[]>([])
   const [selectedItem, setSelectedItem] = useState<ObjectItem | null>(null)
   const [search, setSearch] = useState('')
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
-  const [objectToDelete, setObjectToDelete] = useState<ObjectItem | null>(null)
 
-  // Get the delete mutation from hooks
-  const { useDeleteObject } = useObjects()
-  const { mutateAsync: deleteObject } = useDeleteObject()
+  // Unified delete hook
+  const {
+    isDeleteModalOpen,
+    objectToDelete,
+    isDeleting,
+    handleDelete,
+    handleDeleteConfirm,
+    handleDeleteCancel,
+  } = useUnifiedDelete()
 
   // Filter objects based on search
   const filteredObjects = useMemo(() => {
     return filterObjectsBySearchTerm(data, search)
   }, [search, data])
-
-  // Handle delete action
-  const handleDelete = (item: ObjectItem) => {
-    setObjectToDelete(item)
-    setIsDeleteModalOpen(true)
-  }
-
-  // Handle confirming deletion
-  const handleDeleteConfirm = async (uuid: string) => {
-    try {
-      await deleteObject(uuid)
-      // Remove the deleted object from selection if it was selected
-      if (selectedItem?.uuid === uuid) {
-        setSelectedItem(null)
-      }
-      setIsDeleteModalOpen(false)
-    } catch (error) {
-      console.error('Error deleting object:', error)
-    }
-  }
 
   return (
     <>
@@ -112,18 +97,20 @@ export function ObjectExplorer({
           <DetailsPanel
             item={selectedItem}
             availableModels={availableModels}
-            onDelete={handleDelete}
+            onDelete={(item) =>
+              handleDelete({ uuid: item.uuid, name: item.name })
+            }
           />
         </div>
       </div>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Unified Delete Confirmation Dialog */}
       {isDeleteModalOpen && objectToDelete && (
         <DeleteConfirmationDialog
           open={isDeleteModalOpen}
-          onOpenChange={setIsDeleteModalOpen}
+          onOpenChange={handleDeleteCancel}
           objectName={objectToDelete.name}
-          onDelete={() => handleDeleteConfirm(objectToDelete.uuid)}
+          onDelete={handleDeleteConfirm}
         />
       )}
     </>

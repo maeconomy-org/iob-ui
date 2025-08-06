@@ -26,9 +26,17 @@ export async function POST(req: Request) {
     // Generate a unique job ID early
     const jobId = crypto.randomUUID()
 
+    // Get user fingerprint from headers
+    const userFingerprint =
+      req.headers.get('User-Fingerprint') ||
+      req.headers.get('user-fingerprint') ||
+      req.headers.get('createdBy') ||
+      'defaultFingerprint'
+
     // Create initial job record
     await redis.hset(`import:${jobId}`, {
       status: 'receiving',
+      userFingerprint: userFingerprint,
       createdAt: Date.now().toString(),
     })
 

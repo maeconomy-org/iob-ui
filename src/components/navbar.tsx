@@ -11,6 +11,7 @@ import {
   Menu,
   ChevronRight,
   ChevronDown,
+  X,
 } from 'lucide-react'
 
 import {
@@ -28,25 +29,25 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   CopyButton,
+  Input,
 } from '@/components/ui'
-import { cn } from '@/lib/utils'
+import { cn, formatFingerprint } from '@/lib/utils'
 import { APP_ACRONYM, NAV_ITEMS } from '@/constants'
-import { SearchCommand } from '@/components/search-command'
 import { useAuth } from '@/contexts/auth-context'
+import { useSearch } from '@/contexts/search-context'
 
 export default function Navbar() {
   const pathname = usePathname()
-  const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const { certCommonName, certFingerprint, logout } = useAuth()
-
-  // Function to format fingerprint for display (truncate)
-  const formatFingerprint = (fingerprint: string) => {
-    if (!fingerprint) return ''
-    return fingerprint.length > 24
-      ? `${fingerprint.slice(0, 24)}...`
-      : fingerprint
-  }
+  const {
+    searchQuery,
+    setSearchQuery,
+    isSearching,
+    executeSearchInView,
+    clearSearch,
+    isSearchMode,
+  } = useSearch()
 
   return (
     <header className="border-b bg-white top-0 z-10">
@@ -80,23 +81,35 @@ export default function Navbar() {
           </div>
 
           <div className="flex items-center gap-4">
-            {/* Search Button - Fixed centering */}
-            <Button
-              variant="outline"
-              onClick={() => setIsSearchOpen(true)}
-              className="relative h-9 md:w-40 md:px-3 lg:w-64 justify-between"
-              aria-label="Search"
-            >
-              <div className="flex items-center justify-center">
-                <Search className="h-4 w-4 md:mr-2" />
-                <span className="hidden md:inline text-muted-foreground text-sm">
-                  Search...
-                </span>
-              </div>
-              <kbd className="hidden md:inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
-                <span>/</span>
-              </kbd>
-            </Button>
+            {/* Direct Search Input */}
+            <div className="relative md:w-40 lg:w-64">
+              <Search className="h-4 w-4 absolute left-2.5 top-2.5 text-muted-foreground" />
+              <Input
+                placeholder="Search objects..."
+                className="pl-8 pr-8 h-9"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && searchQuery.trim()) {
+                    executeSearchInView(searchQuery.trim())
+                  }
+                }}
+              />
+              {(searchQuery || isSearchMode) && (
+                <button
+                  onClick={clearSearch}
+                  className="absolute right-2 top-2.5 text-muted-foreground hover:text-foreground"
+                  aria-label="Clear search"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+              {isSearching && (
+                <div className="absolute right-8 top-2.5">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+                </div>
+              )}
+            </div>
 
             {/* User Profile Dropdown - Hidden on Mobile */}
             <div className="hidden md:flex">
@@ -245,8 +258,6 @@ export default function Navbar() {
                 </div>
               </SheetContent>
             </Sheet>
-
-            <SearchCommand open={isSearchOpen} onOpenChange={setIsSearchOpen} />
           </div>
         </div>
       </div>
