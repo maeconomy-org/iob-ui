@@ -237,14 +237,14 @@ export function ObjectDetailsSheet({
                         />
                       </div>
                     </div>
-                    {object?.parents && object?.parents.length && (
+                    {object?.parents && object?.parents.length ? (
                       <div>
                         <div className="text-sm font-medium">Parent UUID</div>
                         <div className="text-sm text-muted-foreground">
-                          {object?.parents[0]}
+                          {object?.parents[0] || ''}
                         </div>
                       </div>
-                    )}
+                    ) : undefined}
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <div className="text-sm font-medium">Name</div>
