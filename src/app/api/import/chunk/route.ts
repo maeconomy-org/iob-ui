@@ -31,12 +31,7 @@ export async function POST(req: Request) {
     const jobId = sessionId || crypto.randomUUID()
 
     // Get user fingerprint from headers
-    const userFingerprint =
-      req.headers.get('User-Fingerprint') ||
-      req.headers.get('user-fingerprint') ||
-      req.headers.get('createdBy') ||
-      'defaultFingerprint'
-
+    const userFingerprint = req.headers.get('createdBy')
     // If this is the first chunk, initialize the job
     if (chunkIndex === 0 && !sessionId) {
       await redis.hset(`import:${jobId}`, {

@@ -35,9 +35,7 @@ export async function processImportJob(jobId: string) {
     const userFingerprint = jobData.userFingerprint || 'defaultFingerprint'
 
     // Determine certificate verification behavior
-    const shouldVerifyCerts =
-      process.env.VERIFY_CERTIFICATES === 'true' ||
-      process.env.NODE_ENV === 'production'
+    const shouldVerifyCerts = process.env.VERIFY_CERTIFICATES === 'true'
 
     // Set up HTTPS agent with client certificates using utility
     const httpsAgent = createCertificateAgent({
@@ -62,7 +60,6 @@ export async function processImportJob(jobId: string) {
       headers: {
         'Content-Type': 'application/json',
         createdBy: userFingerprint,
-        'User-Fingerprint': userFingerprint,
       },
     })
 
