@@ -40,6 +40,7 @@ import {
   useAddressManagement,
   usePropertyEditor,
   useObjectOperations,
+  useParentManagement,
 } from '../hooks'
 import {
   getObjectDisplayName,
@@ -48,6 +49,8 @@ import {
 } from '../utils'
 import { formatFingerprint } from '@/lib/utils'
 import { useUnifiedDelete } from '@/hooks'
+import { ParentDisplay } from './ParentDisplay'
+import { ParentSelector } from './ParentSelector'
 
 interface ObjectSheetProps {
   isOpen: boolean
@@ -78,6 +81,7 @@ export function ObjectDetailsSheet({
   const isMetadataEditing = activeEditingSection === 'metadata'
   const isPropertiesEditing = activeEditingSection === 'properties'
   const isAddressEditing = activeEditingSection === 'address'
+  const isParentsEditing = activeEditingSection === 'parents'
 
   // Use our extracted hooks
   const {
@@ -98,6 +102,20 @@ export function ObjectDetailsSheet({
       initialAddressInfo: addressInfo,
       objectUuid: object?.uuid,
     })
+
+  const {
+    parents,
+    setParents,
+    addParent,
+    removeParent,
+    saveParents,
+    hasParentsChanged,
+    isSaving: isParentsSaving,
+  } = useParentManagement({
+    initialParents: object?.parents || [],
+    objectUuid: object?.uuid,
+    onRefetch: refetchAggregate,
+  })
 
   const { editedProperties, setEditedProperties, saveProperties } =
     usePropertyEditor({
@@ -177,6 +195,15 @@ export function ObjectDetailsSheet({
     }
   }
 
+  const handleSaveParents = async (): Promise<void> => {
+    try {
+      await saveParents()
+      setActiveEditingSection(null)
+    } catch (error) {
+      // Error handling is done in the hook
+    }
+  }
+
   // Handle object deletion with unified modal
   const handleDeleteObject = (objectId: string, objectName: string) => {
     handleDelete({ uuid: objectId, name: objectName })
@@ -237,14 +264,7 @@ export function ObjectDetailsSheet({
                         />
                       </div>
                     </div>
-                    {object?.parents && object?.parents.length ? (
-                      <div>
-                        <div className="text-sm font-medium">Parent UUID</div>
-                        <div className="text-sm text-muted-foreground">
-                          {object?.parents[0] || ''}
-                        </div>
-                      </div>
-                    ) : undefined}
+
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <div className="text-sm font-medium">Name</div>
@@ -403,6 +423,41 @@ export function ObjectDetailsSheet({
                         rows={3}
                       />
                     </div>
+                  </div>
+                )}
+              />
+
+              {/* Parent Objects Section - Now Editable */}
+              <Separator />
+              <EditableSection
+                title="Parent Objects"
+                isEditing={isParentsEditing}
+                onEditToggle={(isEditing) =>
+                  handleEditToggle('parents', isEditing)
+                }
+                onSave={handleSaveParents}
+                successMessage="Parent objects updated successfully"
+                showToast={false}
+                renderDisplay={() => (
+                  <div>
+                    {parents && parents.length > 0 ? (
+                      <ParentDisplay parents={parents} />
+                    ) : (
+                      <div className="text-sm text-muted-foreground">
+                        No parent objects assigned
+                      </div>
+                    )}
+                  </div>
+                )}
+                renderEdit={() => (
+                  <div className="space-y-4">
+                    <ParentSelector
+                      selectedParents={parents}
+                      onParentsChange={setParents}
+                      placeholder="Search for parent objects..."
+                      maxSelections={50}
+                      currentObjectUuid={object?.uuid}
+                    />
                   </div>
                 )}
               />

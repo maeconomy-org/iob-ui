@@ -26,7 +26,8 @@ import {
 import { PropertyField } from '@/components/forms'
 import { objectSchema, ObjectFormValues } from '@/lib/validations/object-model'
 import { HereAddressAutocomplete } from '@/components/ui'
-import { useObjectOperations } from '../hooks/useObjectOperations'
+import { useObjectOperations, useParentLookup } from '../hooks'
+import { ParentSelector, type ParentObject } from './ParentSelector'
 
 // Import utilities
 import { createEmptyProperty } from '../utils'
@@ -55,7 +56,7 @@ export function ObjectAddSheet({
       version: '',
       description: '',
       address: undefined,
-      parentUuid: undefined,
+      parents: [],
       properties: [],
       files: [],
       modelUuid: undefined,
@@ -70,6 +71,9 @@ export function ObjectAddSheet({
   // Watch address field for display
   const watchedAddress = form.watch('address')
 
+  // Watch parent UUIDs field
+  const watchedParents = form.watch('parents') || []
+
   // Reset form when sheet opens
   useEffect(() => {
     if (isOpen) {
@@ -78,7 +82,7 @@ export function ObjectAddSheet({
         abbreviation: '',
         version: '',
         description: '',
-        parentUuid: undefined,
+        parents: [],
         properties: [],
         files: [],
         modelUuid: undefined,
@@ -97,6 +101,16 @@ export function ObjectAddSheet({
 
   const addProperty = () => {
     append(createEmptyProperty())
+  }
+
+  // Use the parent lookup hook to get full parent objects
+  const selectedParents = useParentLookup(watchedParents)
+
+  const handleParentsChange = (parents: ParentObject[]) => {
+    form.setValue(
+      'parents',
+      parents.map((p) => p.uuid)
+    )
   }
 
   return (
@@ -179,29 +193,13 @@ export function ObjectAddSheet({
                 )}
               />
 
-              <div className="grid grid-cols-1 gap-4">
-                <FormField
-                  control={form.control}
-                  name="parentUuid"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Parent UUID</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Enter parent object UUID (optional)"
-                          value={field.value || ''}
-                          onChange={(e) => {
-                            const value = e.target.value
-                            field.onChange(value === '' ? undefined : value)
-                          }}
-                          onBlur={field.onBlur}
-                          name={field.name}
-                          ref={field.ref}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+              {/* Parent Objects Section */}
+              <div className="space-y-4">
+                <ParentSelector
+                  selectedParents={selectedParents}
+                  onParentsChange={handleParentsChange}
+                  placeholder="Search for parent objects..."
+                  maxSelections={50}
                 />
               </div>
 

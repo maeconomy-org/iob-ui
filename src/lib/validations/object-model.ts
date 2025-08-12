@@ -41,7 +41,7 @@ export const objectSchema = z.object({
   version: z.string().optional(),
   description: z.string().optional(),
   address: addressSchema.optional(),
-  parentUuid: z.string().optional(),
+  parents: z.array(z.string()).optional(), // New field for multiple parents
   properties: z.array(propertySchema),
   files: z.array(z.any()).optional(),
   modelUuid: z.string().optional(),

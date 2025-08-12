@@ -185,8 +185,8 @@ export function useObjectOperations({
             }
           : {}),
 
-        // Add parent UUID if it exists
-        parentUuid: object.parentUuid,
+        parents: object.parents,
+
         // Add files directly attached to the object
         files:
           object.files?.map((f: any) => ({
