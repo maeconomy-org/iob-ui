@@ -86,15 +86,17 @@ export function useObjects() {
         }
 
         // According to the ComplexObjectOutput type, there may be a parent property
-        if (data?.parent?.uuid) {
-          queryClient.invalidateQueries({
-            queryKey: ['object', data.parent.uuid],
-          })
-          queryClient.invalidateQueries({
-            queryKey: ['object', data.parent.uuid, 'children'],
-          })
-          queryClient.invalidateQueries({
-            queryKey: ['aggregate', data.parent.uuid],
+        if (data?.parents?.length && data.parents.length > 0) {
+          data.parents.forEach((parent) => {
+            queryClient.invalidateQueries({
+              queryKey: ['object', parent],
+            })
+            queryClient.invalidateQueries({
+              queryKey: ['object', parent, 'children'],
+            })
+            queryClient.invalidateQueries({
+              queryKey: ['aggregate', parent],
+            })
           })
         }
       },
