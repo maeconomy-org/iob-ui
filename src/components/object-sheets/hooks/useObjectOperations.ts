@@ -130,26 +130,22 @@ export function useObjectOperations({
             description: p.description || '',
             type: p.type || '',
           },
-          values:
-            p.values?.length > 0
-              ? [
-                  {
-                    value: {
-                      value: p.values[0].value || '',
-                      valueTypeCast: p.valueTypeCast || 'string',
-                    },
-                    // Add files for this property value if they exist
-                    files:
-                      p.values[0].files?.map((f: any) => ({
-                        file: {
-                          fileName: f.fileName,
-                          fileReference: f.fileReference,
-                          label: f.label || 'Uploaded file',
-                        },
-                      })) || [],
+          values: (p.values || [])
+            .filter((v: any) => v && v.value !== undefined && v.value !== '')
+            .map((v: any) => ({
+              value: {
+                value: v.value,
+                valueTypeCast: v.valueTypeCast || p.valueTypeCast || 'string',
+              },
+              files:
+                (v.files || []).map((f: any) => ({
+                  file: {
+                    fileName: f.fileName,
+                    fileReference: f.fileReference,
+                    label: f.label || 'Uploaded file',
                   },
-                ]
-              : [],
+                })) || [],
+            })),
           // Add files for this property if they exist
           files:
             p.files?.map((f: any) => ({

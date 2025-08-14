@@ -49,7 +49,7 @@ export function PropertyField({
 
   const handleAddValue = () => {
     appendValue({
-      uuid: generateUUIDv7(),
+      uuid: '',
       value: '',
       files: [],
     })
