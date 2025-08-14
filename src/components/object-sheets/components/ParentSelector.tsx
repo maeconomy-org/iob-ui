@@ -149,7 +149,7 @@ export function ParentSelector({
             <Button
               variant="outline"
               size="sm"
-              className="w-full justify-start"
+              className="w-full justify-start h-10"
               disabled={isSearching}
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -162,6 +162,7 @@ export function ParentSelector({
             <Command shouldFilter={false}>
               <div className="relative">
                 <CommandInput
+                  className="ml-2"
                   placeholder={placeholder}
                   value={searchQuery}
                   onValueChange={setSearchQuery}
