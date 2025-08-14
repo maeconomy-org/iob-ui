@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Plus } from 'lucide-react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm, useFieldArray } from 'react-hook-form'
@@ -24,8 +24,6 @@ import {
   SheetFooter,
 } from '@/components/ui'
 import { PropertyField } from '@/components/forms'
-import { AttachmentModal } from './AttachmentModal'
-import { AttachmentList } from './AttachmentList'
 import { objectSchema, ObjectFormValues } from '@/lib/validations/object-model'
 import { HereAddressAutocomplete } from '@/components/ui'
 import { useObjectOperations, useParentLookup } from '../hooks'
@@ -69,9 +67,6 @@ export function ObjectAddSheet({
     control: form.control,
     name: 'properties',
   })
-
-  // Object-level attachments modal state
-  const [isObjectAttachmentsOpen, setIsObjectAttachmentsOpen] = useState(false)
 
   // Watch address field for display
   const watchedAddress = form.watch('address')
@@ -130,15 +125,8 @@ export function ObjectAddSheet({
               </SheetDescription>
             </SheetHeader>
 
-            <div className="space-y-2 py-6">
-              <div className="space-y-2">
-                <ParentSelector
-                  selectedParents={selectedParents}
-                  onParentsChange={handleParentsChange}
-                  placeholder="Search for parent objects..."
-                  maxSelections={10}
-                />
-
+            <div className="space-y-4 py-6">
+              <div className="grid grid-cols-1 gap-4">
                 <FormField
                   control={form.control}
                   name="name"
@@ -152,50 +140,18 @@ export function ObjectAddSheet({
                     </FormItem>
                   )}
                 />
+              </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="abbreviation"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Abbreviation</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="Abbreviation (optional)"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="version"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Version</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Version (optional)" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
+              <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
-                  name="description"
+                  name="abbreviation"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Description</FormLabel>
+                      <FormLabel>Abbreviation</FormLabel>
                       <FormControl>
-                        <Textarea
-                          placeholder="Enter object description"
-                          rows={3}
+                        <Input
+                          placeholder="Abbreviation (optional)"
                           {...field}
                         />
                       </FormControl>
@@ -203,23 +159,63 @@ export function ObjectAddSheet({
                     </FormItem>
                   )}
                 />
+
+                <FormField
+                  control={form.control}
+                  name="version"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Version</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Version (optional)" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Enter object description"
+                        rows={3}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Parent Objects Section */}
+              <div className="space-y-4">
+                <ParentSelector
+                  selectedParents={selectedParents}
+                  onParentsChange={handleParentsChange}
+                  placeholder="Search for parent objects..."
+                  maxSelections={50}
+                />
               </div>
 
               <Separator />
 
               {/* Address Section */}
               <div className="space-y-4">
-                <div className="space-y-2">
-                  <FormLabel>Address</FormLabel>
+                <FormLabel>Address</FormLabel>
 
-                  <HereAddressAutocomplete
-                    value={watchedAddress?.fullAddress || ''}
-                    placeholder="Search for building address..."
-                    onAddressSelect={(fullAddress, components) => {
-                      form.setValue('address', { fullAddress, components })
-                    }}
-                  />
-                </div>
+                <HereAddressAutocomplete
+                  value={watchedAddress?.fullAddress || ''}
+                  placeholder="Search for building address..."
+                  onAddressSelect={(fullAddress, components) => {
+                    form.setValue('address', { fullAddress, components })
+                  }}
+                />
 
                 {watchedAddress?.components && (
                   <div className="mt-3 grid grid-cols-2 gap-2 text-sm text-muted-foreground">
@@ -234,62 +230,6 @@ export function ObjectAddSheet({
                     </div>
                   </div>
                 )}
-              </div>
-
-              <Separator />
-
-              {/* Object-level attachments */}
-              <div className="space-y-2">
-                <FormField
-                  control={form.control}
-                  name="files"
-                  render={({ field }) => (
-                    <FormItem>
-                      <div className="flex justify-between items-center">
-                        <FormLabel>Files</FormLabel>
-                        <Button
-                          size="sm"
-                          type="button"
-                          variant="outline"
-                          onClick={() => setIsObjectAttachmentsOpen(true)}
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Attach File
-                        </Button>
-                      </div>
-
-                      <div className="space-y-2">
-                        <AttachmentList
-                          attachments={field.value || []}
-                          onOpenAttachment={(att) => {
-                            if (att.mode === 'reference' && att.url) {
-                              window.open(
-                                att.url,
-                                '_blank',
-                                'noopener,noreferrer'
-                              )
-                            } else {
-                              // TODO: request a download URL for uploaded files
-                            }
-                          }}
-                          onRemoveAttachment={(att) => {
-                            const next = (field.value || []).filter(
-                              (a: any) => a.uuid !== att.uuid
-                            )
-                            field.onChange(next)
-                          }}
-                        />
-                        <AttachmentModal
-                          open={isObjectAttachmentsOpen}
-                          onOpenChange={setIsObjectAttachmentsOpen}
-                          attachments={field.value || []}
-                          onChange={field.onChange}
-                          title="Object Attachments"
-                        />
-                      </div>
-                    </FormItem>
-                  )}
-                />
               </div>
 
               <Separator />
@@ -318,6 +258,24 @@ export function ObjectAddSheet({
                       onRemove={() => remove(index)}
                     />
                   ))}
+
+                  {fields.length === 0 && (
+                    <div className="text-center p-4 border border-dashed rounded-md">
+                      <p className="text-muted-foreground">
+                        No properties added yet
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-2"
+                        onClick={addProperty}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add First Property
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
