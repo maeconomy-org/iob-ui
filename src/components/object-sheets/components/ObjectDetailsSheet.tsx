@@ -667,7 +667,7 @@ export function ObjectDetailsSheet({
                             postalCode: components?.postalCode,
                             country: components?.country,
                             state: components?.state,
-                            district: '', // API has district but HERE API doesn't provide it
+                            district: components?.district || '',
                           })
                         }}
                         className="mt-1"
