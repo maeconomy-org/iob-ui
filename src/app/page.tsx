@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { useCommonApi } from '@/hooks/api'
 import { Card, Button } from '@/components/ui'
 import { useAuth } from '@/contexts/auth-context'
+import { APP_ACRONYM, APP_DESCRIPTION } from '@/constants'
 
 export default function AuthPage() {
   const router = useRouter()
@@ -67,13 +68,11 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="flex flex-1 items-center justify-center bg-gray-50">
+    <div className="flex flex-1 items-center justify-center">
       <div className="max-w-md w-full space-y-6 p-8">
         <div className="text-center">
-          <h1 className="text-3xl font-bold">Welcome to IoB</h1>
-          <p className="mt-2 text-gray-600">
-            Internet of Buildings - Material Management System
-          </p>
+          <h1 className="text-3xl font-bold">Welcome to {APP_ACRONYM}</h1>
+          <p className="mt-2 text-gray-600">{APP_DESCRIPTION}</p>
         </div>
 
         <Card className="p-6 bg-white shadow-lg rounded-lg">

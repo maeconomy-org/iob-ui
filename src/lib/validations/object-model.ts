@@ -1,13 +1,13 @@
 import * as z from 'zod'
 
 export const propertyValueSchema = z.object({
-  uuid: z.string(),
+  uuid: z.string().optional(),
   value: z.string().min(1, 'Value is required'),
   files: z.array(z.any()),
 })
 
 export const propertySchema = z.object({
-  uuid: z.string(),
+  uuid: z.string().optional(),
   key: z.string().min(1, 'Property name is required'),
   values: z.array(propertyValueSchema),
   files: z.array(z.any()),

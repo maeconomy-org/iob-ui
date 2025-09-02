@@ -1,65 +1,70 @@
 'use client'
 
+import { FileList, type FileData } from './FileDisplay'
 import type { Attachment } from '../utils/attachments'
-import { Button } from '@/components/ui/button'
-import { ExternalLink, Link as LinkIcon, Upload, Trash2 } from 'lucide-react'
 
 type AttachmentListProps = {
   attachments: Attachment[]
-  onOpenAttachment?: (att: Attachment) => void
-  onRemoveAttachment?: (att: Attachment) => void
-  emptyText?: string
+  onRemoveAttachment?: (attachment: Attachment) => void // For removing attachments during creation
+  allowHardRemove?: boolean // Allow hard removal (for non-uploaded files)
+}
+
+/**
+ * Convert Attachment to FileData format for the new FileDisplay component
+ */
+function attachmentToFileData(attachment: Attachment, index: number): FileData {
+  return {
+    uuid: attachment.uuid || `temp-${index}`, // Use uuid if available, fallback to index
+    fileName: attachment.fileName || '',
+    fileReference: attachment.fileReference || attachment.url || '',
+    label: attachment.label,
+    contentType: attachment.mimeType,
+    size: attachment.size,
+    softDeleted: attachment.softDeleted,
+    softDeletedAt: attachment.softDeletedAt,
+  }
 }
 
 export function AttachmentList({
   attachments,
-  onOpenAttachment,
   onRemoveAttachment,
-  emptyText = 'No attachments',
+  allowHardRemove = false,
 }: AttachmentListProps) {
-  // if (!attachments || attachments.length === 0) {
-  //   return (
-  //     <div className="text-sm text-muted-foreground italic">{emptyText}</div>
-  //   )
-  // }
+  // Convert attachments to FileData format
+  const files: FileData[] = attachments.map((att, index) =>
+    attachmentToFileData(att, index)
+  )
 
-  const open = (att: Attachment) => onOpenAttachment?.(att)
-  const remove = (att: Attachment) => onRemoveAttachment?.(att)
+  // Handle file removal by finding corresponding attachment
+  const handleFileRemove = onRemoveAttachment
+    ? (file: FileData) => {
+        // Find attachment by index first (for newly created files without UUID)
+        const fileIndex = files.findIndex(
+          (f) =>
+            f.fileName === file.fileName &&
+            f.contentType === file.contentType &&
+            f.size === file.size
+        )
+
+        if (fileIndex >= 0 && fileIndex < attachments.length) {
+          onRemoveAttachment(attachments[fileIndex])
+        } else {
+          // Fallback to UUID lookup for existing files
+          const attachment = attachments.find(
+            (att) => att.fileName === file.fileName && att.uuid === file.uuid
+          )
+          if (attachment) {
+            onRemoveAttachment(attachment)
+          }
+        }
+      }
+    : undefined
 
   return (
-    <div className="space-y-2">
-      {attachments.map((att) => (
-        <div
-          key={att.uuid}
-          className="flex items-center justify-between text-sm"
-        >
-          <div className="flex items-center gap-2 min-w-0">
-            {att.mode === 'reference' ? (
-              <LinkIcon className="h-4 w-4 text-muted-foreground" />
-            ) : (
-              <Upload className="h-4 w-4 text-muted-foreground" />
-            )}
-            <div className="truncate">{att.label || att.fileName}</div>
-          </div>
-          <div className="flex items-center gap-1">
-            {onOpenAttachment && (
-              <Button variant="ghost" size="icon" onClick={() => open(att)}>
-                <ExternalLink className="h-4 w-4" />
-              </Button>
-            )}
-            {onRemoveAttachment && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-destructive h-8 w-8"
-                onClick={() => remove(att)}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-        </div>
-      ))}
-    </div>
+    <FileList
+      files={files}
+      onRemoveFile={handleFileRemove}
+      allowHardRemove={allowHardRemove}
+    />
   )
 }

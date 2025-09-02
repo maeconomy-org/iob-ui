@@ -1,6 +1,12 @@
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
-import { useObjects } from '@/hooks'
+
+import { useImportApi, useObjects } from '@/hooks'
+import { useIobClient } from '@/providers/query-provider'
+import { getUploadService } from '@/lib/upload-service'
+import type { ImportObjectData } from '@/hooks/api/useImportApi'
+
+import type { Attachment } from '../utils/attachments'
 
 export interface UseObjectOperationsProps {
   initialObject?: any
@@ -29,15 +35,14 @@ export function useObjectOperations({
   const [editedObject, setEditedObject] = useState<any>(null)
 
   // Get the specialized metadata update mutation
-  const { useUpdateObjectMetadata, useDeleteObject, useCreateFullObject } =
-    useObjects()
+  const { useUpdateObjectMetadata, useDeleteObject } = useObjects()
   const updateObjectMetadataMutation = useUpdateObjectMetadata()
   const deleteObjectMutation = useDeleteObject()
 
-  // Get the object creation mutation
-  const createFullObjectMutation = useCreateFullObject()
+  // Get the import API hook (faster approach)
+  const { importSingleObject } = useImportApi()
+  const client = useIobClient()
 
-  // Reset editing object when data changes or editing mode changes
   useEffect(() => {
     if (initialObject && !isEditing) {
       setEditedObject({ ...initialObject })
@@ -116,90 +121,54 @@ export function useObjectOperations({
 
   const createObject = async (object: any): Promise<boolean> => {
     try {
-      console.log('Creating object:', object)
+      // Step 1: Immediate UI feedback and optimistic update
+      toast.loading('Creating object...', { id: 'save-object' })
 
-      // Show loading toast
-      toast.loading('Saving object...', { id: 'save-object' })
+      // Step 2: Separate files from object data
+      const { uploadFiles, importData } = transformToImportFormat(object)
 
-      // Extract properties from the object for the high-level API
-      const objectProperties =
-        object.properties?.map((p: any) => ({
-          property: {
-            key: p.key,
-            label: p.label || '',
-            description: p.description || '',
-            type: p.type || '',
-          },
-          values:
-            p.values?.length > 0
-              ? [
-                  {
-                    value: {
-                      value: p.values[0].value || '',
-                      valueTypeCast: p.valueTypeCast || 'string',
-                    },
-                    // Add files for this property value if they exist
-                    files:
-                      p.values[0].files?.map((f: any) => ({
-                        file: {
-                          fileName: f.fileName,
-                          fileReference: f.fileReference,
-                          label: f.label || 'Uploaded file',
-                        },
-                      })) || [],
-                  },
-                ]
-              : [],
-          // Add files for this property if they exist
-          files:
-            p.files?.map((f: any) => ({
-              file: {
-                fileName: f.fileName,
-                fileReference: f.fileReference,
-                label: f.label || 'Uploaded file',
-              },
-            })) || [],
-        })) || []
+      // Step 3: Create object via new Aggregate API
+      const importResult = await importSingleObject.mutateAsync(importData)
 
-      // Use the createFullObject API for more powerful object creation
-      await createFullObjectMutation.mutateAsync({
-        object: {
-          name: object.name,
-          abbreviation: object.abbreviation || '',
-          version: object.version || '',
-          description: object.description || '',
-        },
-
-        ...(object.address && object.address.fullAddress
-          ? {
-              address: {
-                fullAddress: object.address.fullAddress || '',
-                street: object.address.components.street || '',
-                houseNumber: object.address.components.houseNumber || '',
-                city: object.address.components.city || '',
-                postalCode: object.address.components.postalCode || '',
-                country: object.address.components.country || '',
-                state: object.address.components.state || '',
-                district: object.address.components.district || '',
-              },
-            }
-          : {}),
-
-        parents: object.parents,
-
-        // Add files directly attached to the object
-        files:
-          object.files?.map((f: any) => ({
-            file: {
-              fileName: f.fileName,
-              fileReference: f.fileReference,
-              label: f.label || 'Uploaded file',
-            },
-          })) || [],
-        properties: objectProperties,
+      // Step 4: Show immediate success and handle file uploads in background
+      toast.success('Object created successfully!', {
+        id: 'save-object',
+        description:
+          uploadFiles.length > 0
+            ? `${uploadFiles.length} files uploading in background`
+            : undefined,
       })
 
-      toast.success('Object created successfully', { id: 'save-object' })
+      // Step 5: Upload files in background if any (don't await - let it run in background)
+      if (uploadFiles.length > 0) {
+        const uploadService = getUploadService(client)
+
+        // Map files to their correct context UUIDs from Aggregate API response
+        const fileContexts = mapFileContexts(uploadFiles, importResult)
+
+        if (fileContexts.length > 0) {
+          // Start upload in background and handle results
+          uploadService.queueFileUploadsWithContext(fileContexts).then(() => {
+            // Wait a bit for uploads to complete, then show summary
+            setTimeout(async () => {
+              const summary = uploadService.getUploadSummary()
+              if (summary.completed.length > 0) {
+                toast.success(
+                  `${summary.completed.length} files uploaded successfully`
+                )
+              }
+              if (summary.failed.length > 0) {
+                toast.error(`${summary.failed.length} files failed to upload`)
+              }
+              uploadService.clearCompleted()
+            }, 2000)
+          })
+        } else {
+          console.warn(
+            'No file contexts could be mapped from Aggregate API response'
+          )
+        }
+      }
 
       // Trigger refetch if provided
       if (onRefetch) {
@@ -209,9 +178,237 @@ export function useObjectOperations({
       return true
     } catch (error: any) {
       console.error('Error creating object:', error)
-      toast.error('Failed to save object', { id: 'save-object' })
+      toast.error('Failed to create object', {
+        id: 'save-object',
+        description: error.message,
+      })
       return false
     }
+  }
+
+  /**
+   * Transform form object to import API format and separate upload files
+   */
+  const transformToImportFormat = (
+    object: any
+  ): {
+    importData: ImportObjectData
+    uploadFiles: Attachment[]
+  } => {
+    const uploadFiles: Attachment[] = []
+
+    // Transform object-level files
+    const objectFiles =
+      object.files
+        ?.map((file: Attachment) => {
+          if (file.mode === 'upload') {
+            // Add to upload queue with object context
+            uploadFiles.push({ ...file, context: 'object' })
+            // Don't include upload files in Aggregate API payload
+            return null
+          } else {
+            // Only reference files go to Aggregate API
+            return {
+              fileName: file.fileName,
+              fileReference: file.url || file.fileReference || '',
+              label: file.label,
+              contentType: file.mimeType,
+              size: file.size,
+            }
+          }
+        })
+        .filter(Boolean) || []
+
+    // Transform properties and handle their files
+    const properties =
+      object.properties?.map((prop: any, propertyIndex: number) => {
+        // Handle property-level files
+        const propFiles =
+          prop.files
+            ?.map((file: Attachment) => {
+              if (file.mode === 'upload') {
+                uploadFiles.push({
+                  ...file,
+                  context: 'property',
+                  propertyKey: prop.key,
+                  propertyIndex: propertyIndex,
+                })
+                return null
+              } else {
+                // Only reference files go to Aggregate API
+                return {
+                  fileName: file.fileName,
+                  fileReference: file.url || file.fileReference || '',
+                  label: file.label,
+                  contentType: file.mimeType,
+                  size: file.size,
+                }
+              }
+            })
+            .filter(Boolean) || []
+
+        // Handle values and their files
+        const values =
+          prop.values?.map((value: any, valueIndex: number) => {
+            const valueFiles =
+              value.files
+                ?.map((file: Attachment) => {
+                  if (file.mode === 'upload') {
+                    uploadFiles.push({
+                      ...file,
+                      context: 'value',
+                      propertyKey: prop.key,
+                      propertyIndex: propertyIndex,
+                      valueIndex: valueIndex,
+                    })
+                    return null
+                  } else {
+                    // Only reference files go to Aggregate API
+                    return {
+                      fileName: file.fileName,
+                      fileReference: file.url || file.fileReference || '',
+                      label: file.label,
+                      contentType: file.mimeType,
+                      size: file.size,
+                    }
+                  }
+                })
+                .filter(Boolean) || []
+
+            return {
+              value: value.value,
+              valueTypeCast: value.valueTypeCast || 'string',
+              sourceType: value.sourceType || 'manual',
+              files: valueFiles,
+            }
+          }) || []
+
+        return {
+          key: prop.key,
+          label: prop.label || prop.key,
+          type: prop.type || 'string',
+          values,
+          files: propFiles,
+        }
+      }) || []
+
+    const importData: ImportObjectData = {
+      name: object.name,
+      abbreviation: object.abbreviation,
+      version: object.version,
+      description: object.description,
+      ...(object.address && object.address.fullAddress
+        ? {
+            address: {
+              fullAddress: object.address.fullAddress,
+              street: object.address.components?.street || '',
+              houseNumber: object.address.components?.houseNumber || '',
+              city: object.address.components?.city || '',
+              postalCode: object.address.components?.postalCode || '',
+              country: object.address.components?.country || '',
+              state: object.address.components?.state,
+              district: object.address.components?.district,
+            },
+          }
+        : {}),
+      parents: object.parents,
+      files: objectFiles,
+      properties,
+    }
+
+    return { importData, uploadFiles }
+  }
+
+  /**
+   * Map upload files to their correct context UUIDs from Aggregate API response
+   */
+  const mapFileContexts = (
+    uploadFiles: Attachment[],
+    aggregateResult: any
+  ): Array<{
+    attachment: Attachment
+    objectUuid?: string
+    propertyUuid?: string
+    valueUuid?: string
+  }> => {
+    const fileContexts: Array<{
+      attachment: Attachment
+      objectUuid?: string
+      propertyUuid?: string
+      valueUuid?: string
+    }> = []
+
+    console.log('Mapping file contexts for object creation:', {
+      uploadFiles: uploadFiles.length,
+    })
+
+    const objectUuid =
+      aggregateResult?.uuid ||
+      aggregateResult?.objectUuid ||
+      aggregateResult?.data?.uuid ||
+      aggregateResult?.[0]?.uuid
+
+    for (const file of uploadFiles) {
+      const context: {
+        attachment: Attachment
+        objectUuid?: string
+        propertyUuid?: string
+        valueUuid?: string
+      } = { attachment: file }
+
+      if (file.context === 'object') {
+        context.objectUuid = objectUuid
+      } else if (
+        file.context === 'property' &&
+        typeof file.propertyIndex === 'number'
+      ) {
+        const property = getPropertyByIndex(aggregateResult, file.propertyIndex)
+        context.objectUuid = objectUuid
+        context.propertyUuid = property?.uuid
+      } else if (
+        file.context === 'value' &&
+        typeof file.propertyIndex === 'number' &&
+        typeof file.valueIndex === 'number'
+      ) {
+        const property = getPropertyByIndex(aggregateResult, file.propertyIndex)
+        const value = property?.values?.[file.valueIndex]
+        context.objectUuid = objectUuid
+        context.propertyUuid = property?.uuid
+        context.valueUuid = value?.uuid
+      }
+
+      if (context.objectUuid) {
+        fileContexts.push(context)
+      }
+    }
+
+    console.log('File mapping completed:', {
+      total: fileContexts.length,
+      object: fileContexts.filter((f) => f.attachment.context === 'object')
+        .length,
+      property: fileContexts.filter((f) => f.attachment.context === 'property')
+        .length,
+      value: fileContexts.filter((f) => f.attachment.context === 'value')
+        .length,
+    })
+
+    return fileContexts
+  }
+
+  /**
+   * Get property by index in aggregate result (more reliable than key lookup for duplicates)
+   */
+  const getPropertyByIndex = (
+    aggregateResult: any,
+    propertyIndex: number
+  ): any => {
+    const properties =
+      aggregateResult?.properties || // Direct properties array
+      aggregateResult?.data?.properties || // Wrapped in data object
+      aggregateResult?.[0]?.properties || // Array response with object at index 0
+      aggregateResult?.object?.properties // Object wrapper
+
+    return properties?.[propertyIndex] || null
   }
 
   return {
@@ -221,6 +418,6 @@ export function useObjectOperations({
     deleteObject,
     createObject,
     hasMetadataChanged,
-    isCreating: createFullObjectMutation.isPending,
+    isCreating: importSingleObject.isPending,
   }
 }

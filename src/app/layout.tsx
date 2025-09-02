@@ -7,6 +7,7 @@ import Footer from '@/components/footer'
 import ClientLayout from '@/components/client-layout'
 import { SearchProvider } from '@/contexts/search-context'
 import { QueryProvider } from '@/providers/query-provider'
+import { UploadProgressIndicator } from '@/components/ui/upload-progress-indicator'
 import { APP_NAME, APP_DESCRIPTION } from '@/constants'
 
 export const metadata: Metadata = {
@@ -33,6 +34,7 @@ export default function RootLayout({
             <ClientLayout>{children}</ClientLayout>
             <Footer />
             <Toaster />
+            <UploadProgressIndicator />
           </SearchProvider>
         </QueryProvider>
       </body>

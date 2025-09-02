@@ -1,7 +1,7 @@
 // App information
-export const APP_NAME = 'Internet of Buildings'
+export const APP_NAME = 'Internet of Materials'
 export const APP_DESCRIPTION = 'Material Management System'
-export const APP_ACRONYM = 'IoB'
+export const APP_ACRONYM = 'IoM'
 
 // Auth-related
 export const AUTH_SESSION_KEY = 'auth_status'
@@ -23,7 +23,7 @@ export const FOOTER_LINKS = [
 ]
 
 // Contact information
-export const SUPPORT_EMAIL = 'support@internetofbuildings.com'
+export const SUPPORT_EMAIL = 'support@internetofmaterials.com'
 export const CONTACT_URL = 'https://example.com/contact'
 
 // -------------------------------------------------------
