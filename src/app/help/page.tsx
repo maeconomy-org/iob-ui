@@ -1,10 +1,9 @@
 'use client'
 
-import { useState } from 'react'
 import Link from 'next/link'
 import { Download, HelpCircle, ArrowLeft } from 'lucide-react'
 
-import { SUPPORT_EMAIL } from '@/constants'
+import { APP_ACRONYM, SUPPORT_EMAIL } from '@/constants'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
@@ -16,8 +15,6 @@ import {
 } from '@/components/ui/card'
 
 export default function HelpPage() {
-  const [activeTab, setActiveTab] = useState('installation')
-
   return (
     <div className="container mx-auto py-8 px-4">
       <div className="max-w-4xl mx-auto">
@@ -80,14 +77,14 @@ export default function HelpPage() {
               <CardHeader>
                 <CardTitle>Using Your Certificate</CardTitle>
                 <CardDescription>
-                  Learn how to use your certificate with IoB
+                  Learn how to use your certificate with {APP_ACRONYM}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <h3 className="font-semibold">First-Time Login</h3>
                   <ol className="list-decimal list-inside space-y-1 ml-4">
-                    <li>Open IoB application</li>
+                    <li>Open {APP_ACRONYM} application</li>
                     <li>Click "Authorize"</li>
                     <li>Select your certificate when prompted</li>
                     <li>Click OK/Allow</li>

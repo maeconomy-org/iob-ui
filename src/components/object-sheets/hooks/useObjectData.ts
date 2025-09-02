@@ -88,7 +88,7 @@ export function useObjectData({
         properties: (source.properties || []).filter(
           (prop: any) => !prop.softDeleted
         ),
-        files: (source.files || []).filter((file: any) => !file.softDeleted),
+        files: source.files || [],
         objectHistory: [],
         addressInfo,
       }

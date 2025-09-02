@@ -10,8 +10,18 @@ export function useAddresses() {
   // Create address mutation
   const useCreateAddress = () => {
     return useMutation({
-      mutationFn: async (address: Omit<UUAddressDTO, 'uuid'>) => {
-        const response = await client.addresses.create(address)
+      mutationFn: async ({
+        objectUuid,
+        address,
+      }: {
+        objectUuid: string
+        address: Omit<UUAddressDTO, 'uuid'>
+      }) => {
+        const response = await client.addresses.createForObject(
+          objectUuid,
+          address as any
+        )
+
         return response.data
       },
       onSuccess: () => {

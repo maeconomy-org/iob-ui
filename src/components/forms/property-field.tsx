@@ -6,7 +6,6 @@ import {
 } from 'react-hook-form'
 import { PlusIcon, UploadIcon, XIcon } from 'lucide-react'
 
-import { generateUUIDv7 } from '@/lib/utils'
 import {
   AttachmentModal,
   AttachmentList,
@@ -59,13 +58,10 @@ export function PropertyField({
 
   const handleAddValue = () => {
     appendValue({
-      uuid: generateUUIDv7(),
       value: '',
       files: [],
     })
   }
-
-  // Attachments managed via AttachmentSection component below
 
   // Modal state: value-level tracks which index is open; property-level separate
   const [openValueIndex, setOpenValueIndex] = useState<number | null>(null)
@@ -128,12 +124,12 @@ export function PropertyField({
                   )}
                   <AttachmentList
                     attachments={field.value || []}
-                    onRemoveAttachment={(att) => {
-                      const next = (field.value || []).filter(
-                        (a: any) => a.uuid !== att.uuid
-                      )
-                      field.onChange(next)
-                    }}
+                    // onRemoveAttachment={(att) => {
+                    //   const next = (field.value || []).filter(
+                    //     (a: any) => a.uuid !== att.uuid
+                    //   )
+                    //   field.onChange(next)
+                    // }}
                   />
                   <AttachmentModal
                     open={isPropertyFilesOpen}
@@ -141,6 +137,7 @@ export function PropertyField({
                     attachments={field.value || []}
                     onChange={field.onChange}
                     title="Property Attachments"
+                    disableAutoUpload={true}
                   />
                 </div>
               )}
@@ -202,12 +199,12 @@ export function PropertyField({
                   )}
                   <AttachmentList
                     attachments={field.value || []}
-                    onRemoveAttachment={(att) => {
-                      const next = (field.value || []).filter(
-                        (a: any) => a.uuid !== att.uuid
-                      )
-                      field.onChange(next)
-                    }}
+                    // onRemoveAttachment={(att) => {
+                    //   const next = (field.value || []).filter(
+                    //     (a: any) => a.index !== att.index
+                    //   )
+                    //   field.onChange(next)
+                    // }}
                   />
                   <AttachmentModal
                     open={openValueIndex === valueIndex}
@@ -217,6 +214,7 @@ export function PropertyField({
                     attachments={field.value || []}
                     onChange={field.onChange}
                     title="Value Attachments"
+                    disableAutoUpload={true}
                   />
                 </div>
               )}

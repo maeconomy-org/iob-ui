@@ -14,7 +14,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { generateUUIDv7 } from '@/lib/utils'
 
 interface FileManagementModalProps {
   object: any
@@ -59,7 +58,6 @@ export function FileManagementModal({
 
         // Add the file to the object
         const newFile = {
-          uuid: generateUUIDv7(),
           name: selectedFile.name,
           size: formatFileSize(selectedFile.size),
           description: fileDescription,

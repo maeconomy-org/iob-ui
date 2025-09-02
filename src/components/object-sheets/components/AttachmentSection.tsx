@@ -1,23 +1,17 @@
 'use client'
 
 import { useState } from 'react'
-import {
-  Plus,
-  Link as LinkIcon,
-  Upload,
-  ExternalLink,
-  Trash2,
-} from 'lucide-react'
+import { Link as LinkIcon, Upload, Trash2 } from 'lucide-react'
 
-import { Button, Input, Label, Separator } from '@/components/ui'
+import { Button, Input, Separator } from '@/components/ui'
 import { FileDropzone } from '@/components/ui/file-dropzone'
-import type { Attachment, AttachmentMode } from '../utils/attachments'
+
+import type { Attachment } from '../utils/attachments'
 import {
   bytesToReadable,
   getMaxUploadSizeMB,
   isOversize,
 } from '../utils/attachments'
-import { generateUUIDv7 } from '@/lib/utils'
 
 type AttachmentSectionProps = {
   title?: string
@@ -44,13 +38,10 @@ export function AttachmentSection({
   const handleAddReference = () => {
     if (!referenceUrl.trim()) return
     const url = referenceUrl.trim()
-    const fileName = url.split('/').pop() || 'reference'
     const att: Attachment = {
-      uuid: generateUUIDv7(),
       mode: 'reference',
-      fileName,
-      url,
-      label: referenceLabel || undefined,
+      fileReference: url,
+      label: referenceLabel || url || undefined,
     }
     onChange([...(attachments || []), att])
     setReferenceUrl('')
@@ -62,8 +53,6 @@ export function AttachmentSection({
     setError(null)
     const maxMB = getMaxUploadSizeMB()
 
-    // For now, just simulate upload and create local attachment entries.
-    // TODO: Implement actual API upload via FormData and persist returned fileReference/url
     setIsUploading(true)
     setUploadProgress(10)
 
@@ -74,12 +63,11 @@ export function AttachmentSection({
         continue
       }
       accepted.push({
-        uuid: generateUUIDv7(),
         mode: 'upload',
         fileName: file.name,
         size: file.size,
         mimeType: file.type,
-        // TODO: after successful upload, set fileReference from backend response
+        blob: file,
       })
     }
 
@@ -94,16 +82,33 @@ export function AttachmentSection({
     setUploadProgress(0)
   }
 
-  const removeAttachment = (uuid: string) => {
-    onChange((attachments || []).filter((a) => a.uuid !== uuid))
+  const removeAttachment = (index: number) => {
+    onChange((attachments || []).filter((_, i) => i !== index))
   }
 
-  const openAttachment = (att: Attachment) => {
-    if (att.mode === 'reference' && att.url) {
-      window.open(att.url, '_blank', 'noopener,noreferrer')
-      return
+  const truncateFilename = (filename: string) => {
+    if (!filename) return 'unknown'
+    // Find last dot index
+    const lastDotIndex = filename.lastIndexOf('.')
+
+    // Extract name and extension
+    let name = null
+    let extension = null
+
+    if (lastDotIndex !== -1) {
+      name = filename.substring(0, lastDotIndex)
+      extension = filename.substring(lastDotIndex + 1)
+    } else {
+      // No extension found
+      name = filename
     }
-    // TODO: Request a download url from backend for uploaded files and open it
+
+    // Truncate name if longer than 20 characters
+    if (name.length > 25) {
+      name = name.substring(0, 25).trim()
+    }
+
+    return name + '.' + extension
   }
 
   return (
@@ -116,7 +121,6 @@ export function AttachmentSection({
           progress={uploadProgress}
           error={error}
           disabled={disabled}
-          accept={{ '*/*': [] }}
           multiple
           className="py-8"
         >
@@ -164,10 +168,10 @@ export function AttachmentSection({
       <Separator />
 
       {(attachments?.length ?? 0) > 0 ? (
-        <div className="space-y-2">
-          {(attachments || []).map((att) => (
+        <div className="space-y-2 overflow-y-auto max-h-[200px]">
+          {(attachments || []).map((att, index) => (
             <div
-              key={att.uuid}
+              key={index}
               className="flex items-center justify-between text-sm border rounded-md px-3 py-2"
             >
               <div className="flex items-center gap-2 min-w-0">
@@ -178,12 +182,12 @@ export function AttachmentSection({
                 )}
                 <div className="min-w-0">
                   <div className="truncate font-medium">
-                    {att.label || att.fileName}
+                    {att.label || truncateFilename(att.fileName || '')}
                   </div>
                   <div className="text-xs text-muted-foreground">
                     {att.mode === 'reference'
                       ? 'External reference'
-                      : `${att.mimeType || 'file'} • ${bytesToReadable(att.size)}`}
+                      : `File • ${bytesToReadable(att.size)}`}
                   </div>
                 </div>
               </div>
@@ -192,7 +196,10 @@ export function AttachmentSection({
                   variant="ghost"
                   size="icon"
                   className="text-destructive"
-                  onClick={() => removeAttachment(att.uuid)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    removeAttachment(index)
+                  }}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>

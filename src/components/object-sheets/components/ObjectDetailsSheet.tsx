@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Clock,
   MapPin,
+  Plus,
 } from 'lucide-react'
 
 import {
@@ -28,11 +29,14 @@ import {
   Label,
   EditableSection,
   CopyButton,
+  HereAddressAutocomplete,
 } from '@/components/ui'
+import { Upload } from 'lucide-react'
+import { useUnifiedDelete } from '@/hooks'
+import { formatFingerprint } from '@/lib/utils'
+
 import { DeleteConfirmationDialog } from '@/components/modals'
-import { HereAddressAutocomplete } from '@/components/ui/'
 import { PropertySectionEditor } from '@/components/properties'
-import { formatPropertyValue } from '@/lib/object-utils'
 
 // Import our extracted hooks and utilities
 import {
@@ -47,10 +51,26 @@ import {
   getObjectTimestamps,
   getSoftDeleteInfo,
 } from '../utils'
-import { formatFingerprint } from '@/lib/utils'
-import { useUnifiedDelete } from '@/hooks'
 import { ParentDisplay } from './ParentDisplay'
 import { ParentSelector } from './ParentSelector'
+import { AttachmentModal } from './AttachmentModal'
+import { FileList, type FileData } from './FileDisplay'
+import { isExternalFileReference, type Attachment } from '../utils/attachments'
+
+// Helper function to convert API files to FileData format
+const convertApiFilesToFileData = (files: any[]): FileData[] => {
+  if (!files) return []
+  return files.map((file: any) => ({
+    uuid: file.uuid,
+    fileName: file.fileName,
+    fileReference: file.fileReference,
+    label: file.label,
+    contentType: file.contentType,
+    size: file.size,
+    softDeleted: file.softDeleted,
+    softDeletedAt: file.softDeletedAt,
+  }))
+}
 
 interface ObjectSheetProps {
   isOpen: boolean
@@ -77,6 +97,25 @@ export function ObjectDetailsSheet({
   )
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
 
+  // File management state
+  const [isObjectFilesModalOpen, setIsObjectFilesModalOpen] = useState(false)
+  const [objectFiles, setObjectFiles] = useState<Attachment[]>([])
+
+  // Property and value attachment modal states
+  const [attachmentModal, setAttachmentModal] = useState<{
+    isOpen: boolean
+    type: 'property' | 'value' | null
+    propertyUuid?: string
+    valueUuid?: string
+    propertyIndex?: number
+    valueIndex?: number
+    attachments?: Attachment[]
+  }>({
+    isOpen: false,
+    type: null,
+    attachments: [],
+  })
+
   // Derived states for editing modes
   const isMetadataEditing = activeEditingSection === 'metadata'
   const isPropertiesEditing = activeEditingSection === 'properties'
@@ -89,6 +128,7 @@ export function ObjectDetailsSheet({
     properties,
     objectHistory,
     addressInfo,
+    files,
     isLoading,
     refetchAggregate,
   } = useObjectData({
@@ -97,21 +137,35 @@ export function ObjectDetailsSheet({
     isOpen,
   })
 
+  // Initialize object files from the fetched data
+  useEffect(() => {
+    if (files && files.length > 0) {
+      const attachments: Attachment[] = files.map((file: any) => ({
+        mode: isExternalFileReference(file.fileReference)
+          ? 'reference'
+          : 'upload',
+        fileName: file.fileName,
+        fileReference: file.fileReference,
+        label: file.label,
+        uuid: file.uuid,
+        mimeType: file.contentType,
+        size: file.size,
+        softDeleted: file.softDeleted,
+        softDeletedAt: file.softDeletedAt,
+      }))
+      setObjectFiles(attachments)
+    } else {
+      setObjectFiles([])
+    }
+  }, [files])
+
   const { addressData, editedAddressData, setEditedAddressData, saveAddress } =
     useAddressManagement({
       initialAddressInfo: addressInfo,
       objectUuid: object?.uuid,
     })
 
-  const {
-    parents,
-    setParents,
-    addParent,
-    removeParent,
-    saveParents,
-    hasParentsChanged,
-    isSaving: isParentsSaving,
-  } = useParentManagement({
+  const { parents, setParents, saveParents } = useParentManagement({
     initialParents: object?.parents || [],
     objectUuid: object?.uuid,
     onRefetch: refetchAggregate,
@@ -139,6 +193,59 @@ export function ObjectDetailsSheet({
     handleDeleteConfirm,
     handleDeleteCancel,
   } = useUnifiedDelete()
+
+  // File management handlers - now simplified since AttachmentModal handles uploads
+  const handleObjectFilesChange = (newAttachments: Attachment[]) => {
+    setObjectFiles(newAttachments)
+  }
+
+  const handleUploadComplete = () => {
+    // Refresh the object data to show updated files
+    refetchAggregate?.()
+  }
+
+  const handleOpenObjectFilesModal = () => {
+    setIsObjectFilesModalOpen(true)
+  }
+
+  // Handlers for property and value attachment modals
+  const handleOpenPropertyAttachmentModal = (
+    propertyUuid: string,
+    _propertyIndex: number
+  ) => {
+    setAttachmentModal({
+      isOpen: true,
+      type: 'property',
+      propertyUuid,
+      propertyIndex: _propertyIndex,
+      attachments: [],
+    })
+  }
+
+  const handleOpenValueAttachmentModal = (
+    propertyUuid: string,
+    valueUuid: string,
+    _propertyIndex: number,
+    _valueIndex: number
+  ) => {
+    setAttachmentModal({
+      isOpen: true,
+      type: 'value',
+      propertyUuid,
+      valueUuid,
+      propertyIndex: _propertyIndex,
+      valueIndex: _valueIndex,
+      attachments: [],
+    })
+  }
+
+  const handleCloseAttachmentModal = () => {
+    setAttachmentModal({
+      isOpen: false,
+      type: null,
+      attachments: [],
+    })
+  }
 
   // Exit early if no object and still loading
   if (!object && isOpen && !isLoading) {
@@ -241,7 +348,7 @@ export function ObjectDetailsSheet({
               <Loader2 className="h-4 w-4 animate-spin" />
             </div>
           ) : (
-            <div className="space-y-6 py-6">
+            <div className="space-y-2 py-6">
               {/* Metadata Section - Now Editable */}
               <EditableSection
                 title="Metadata"
@@ -443,9 +550,9 @@ export function ObjectDetailsSheet({
                     {parents && parents.length > 0 ? (
                       <ParentDisplay parents={parents} />
                     ) : (
-                      <div className="text-sm text-muted-foreground">
+                      <p className="text-sm text-muted-foreground">
                         No parent objects assigned
-                      </div>
+                      </p>
                     )}
                   </div>
                 )}
@@ -459,138 +566,6 @@ export function ObjectDetailsSheet({
                       currentObjectUuid={object?.uuid}
                     />
                   </div>
-                )}
-              />
-
-              {/* Properties Section - Now uses PropertySectionEditor */}
-              <Separator />
-              <EditableSection
-                title="Properties"
-                isEditing={isPropertiesEditing}
-                onEditToggle={(isEditing) =>
-                  handleEditToggle('properties', isEditing)
-                }
-                onSave={handleSaveProperties}
-                successMessage="Object properties updated successfully"
-                showToast={false}
-                renderDisplay={() => (
-                  <div>
-                    {properties && properties.length > 0 ? (
-                      <div className="space-y-2">
-                        {properties.map((prop: any, idx: number) => (
-                          <div
-                            key={prop.uuid || idx}
-                            className="border rounded-md overflow-hidden"
-                          >
-                            {/* Property header - always visible */}
-                            <div
-                              className="grid grid-cols-3 gap-2 py-2 px-3 hover:bg-muted/20 cursor-pointer"
-                              onClick={() =>
-                                togglePropertyExpansion(
-                                  prop.uuid || `idx-${idx}`
-                                )
-                              }
-                            >
-                              <div className="font-medium text-sm flex items-center">
-                                <ChevronRight
-                                  className={`h-4 w-4 mr-2 transition-transform ${
-                                    expandedPropertyId ===
-                                    (prop.uuid || `idx-${idx}`)
-                                      ? 'rotate-90'
-                                      : ''
-                                  }`}
-                                />
-                                {prop.key}
-                              </div>
-                              <div className="col-span-2 text-sm">
-                                {formatPropertyValue(prop)}
-                              </div>
-                            </div>
-
-                            {/* Expanded content */}
-                            {expandedPropertyId ===
-                              (prop.uuid || `idx-${idx}`) && (
-                              <div className="border-t bg-muted/10 px-4 py-3">
-                                <div className="mb-4 space-y-3">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-sm text-muted-foreground">
-                                      UUID:
-                                    </span>
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-mono text-xs">
-                                        {prop.uuid || 'Not set'}
-                                      </span>
-                                      {prop.uuid && (
-                                        <CopyButton
-                                          text={prop.uuid}
-                                          label="Property UUID"
-                                          size="sm"
-                                        />
-                                      )}
-                                    </div>
-                                  </div>
-
-                                  {prop.type && (
-                                    <div className="flex items-center justify-between">
-                                      <span className="text-sm text-muted-foreground">
-                                        Type:
-                                      </span>
-                                      <span>{prop.type}</span>
-                                    </div>
-                                  )}
-
-                                  {prop.description && (
-                                    <div>
-                                      <span className="text-sm text-muted-foreground">
-                                        Description:
-                                      </span>
-                                      <p className="mt-1">{prop.description}</p>
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* Property Values Section */}
-                                <div>
-                                  <h4 className="font-medium mb-2">Values</h4>
-
-                                  <div className="space-y-2">
-                                    {(prop.values || []).map(
-                                      (value: any, index: number) => (
-                                        <div
-                                          key={value.uuid || `value-${index}`}
-                                          className="p-2 border rounded-md bg-background"
-                                        >
-                                          {value.value}
-                                        </div>
-                                      )
-                                    )}
-
-                                    {(!prop.values ||
-                                      prop.values.length === 0) && (
-                                      <div className="text-sm text-muted-foreground">
-                                        No values defined
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-sm text-muted-foreground bg-muted/20 rounded-md p-3">
-                        No properties defined for this object
-                      </div>
-                    )}
-                  </div>
-                )}
-                renderEdit={() => (
-                  <PropertySectionEditor
-                    properties={editedProperties}
-                    isEditable={true}
-                    onUpdate={setEditedProperties}
-                  />
                 )}
               />
 
@@ -645,9 +620,9 @@ export function ObjectDetailsSheet({
                         </div>
                       </div>
                     ) : (
-                      <div className="text-sm text-muted-foreground bg-muted/20 rounded-md p-3">
+                      <p className="text-sm text-muted-foreground">
                         No address specified for this object
-                      </div>
+                      </p>
                     )}
                   </div>
                 )}
@@ -667,7 +642,7 @@ export function ObjectDetailsSheet({
                             postalCode: components?.postalCode,
                             country: components?.country,
                             state: components?.state,
-                            district: '', // API has district but HERE API doesn't provide it
+                            district: components?.district || '',
                           })
                         }}
                         className="mt-1"
@@ -728,6 +703,227 @@ export function ObjectDetailsSheet({
                   </div>
                 )}
               />
+
+              {/* Properties Section - Now uses PropertySectionEditor */}
+              <Separator />
+              <EditableSection
+                title="Properties"
+                isEditing={isPropertiesEditing}
+                onEditToggle={(isEditing) =>
+                  handleEditToggle('properties', isEditing)
+                }
+                onSave={handleSaveProperties}
+                successMessage="Object properties updated successfully"
+                showToast={false}
+                renderDisplay={() => (
+                  <div>
+                    {properties && properties.length > 0 ? (
+                      <div className="space-y-2">
+                        {properties.map((prop: any, idx: number) => (
+                          <div
+                            key={prop.uuid || idx}
+                            className="border rounded-md overflow-hidden"
+                          >
+                            {/* Property header - always visible */}
+                            <div
+                              className="py-2 px-3 hover:bg-muted/20 cursor-pointer"
+                              onClick={() =>
+                                togglePropertyExpansion(
+                                  prop.uuid || `idx-${idx}`
+                                )
+                              }
+                            >
+                              <div className="flex items-start gap-2">
+                                <ChevronRight
+                                  className={`h-4 w-4 mt-0.5 transition-transform flex-shrink-0 ${
+                                    expandedPropertyId ===
+                                    (prop.uuid || `idx-${idx}`)
+                                      ? 'rotate-90'
+                                      : ''
+                                  }`}
+                                />
+                                <div className="min-w-0 flex-1">
+                                  <div className="font-medium text-sm mb-1 break-words">
+                                    {prop.key}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Expanded content */}
+                            {expandedPropertyId ===
+                              (prop.uuid || `idx-${idx}`) && (
+                              <div className="border-t bg-muted/10 px-4 py-3 space-y-4">
+                                {/* Property Details Header */}
+                                <div className="flex items-center justify-between pb-2 border-b">
+                                  <div>
+                                    <div className="font-medium text-sm">
+                                      {prop.key}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                      Property Details
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-mono text-xs text-muted-foreground">
+                                      {prop.uuid || 'No UUID'}
+                                    </span>
+                                    {prop.uuid && (
+                                      <CopyButton
+                                        text={prop.uuid}
+                                        label="Property UUID"
+                                        size="sm"
+                                      />
+                                    )}
+                                    {prop.uuid && !isPropertiesEditing && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() =>
+                                          handleOpenPropertyAttachmentModal(
+                                            prop.uuid,
+                                            idx
+                                          )
+                                        }
+                                        className="h-7 px-2"
+                                      >
+                                        <Upload className="h-3 w-3 mr-1" />
+                                        Attach
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Property Files Section */}
+                                {prop.files && prop.files.length > 0 && (
+                                  <div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <div className="text-sm font-medium">
+                                        Files attached to property
+                                      </div>
+                                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+                                        {prop.files.length}
+                                      </span>
+                                    </div>
+                                    <FileList
+                                      files={convertApiFilesToFileData(
+                                        prop.files
+                                      )}
+                                    />
+                                  </div>
+                                )}
+
+                                {/* Property Values Section */}
+                                <div>
+                                  <div className="text-sm font-medium mb-2">
+                                    Values ({(prop.values || []).length})
+                                  </div>
+
+                                  <div className="space-y-3">
+                                    {(prop.values || []).map(
+                                      (value: any, index: number) => (
+                                        <div
+                                          key={value.uuid || `value-${index}`}
+                                          className="p-3 border rounded-md bg-background space-y-2"
+                                        >
+                                          <div className="flex items-center justify-between">
+                                            <div className="font-medium text-sm">
+                                              {value.value}
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                              {value.files &&
+                                                value.files.length > 0 && (
+                                                  <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
+                                                    {value.files.length} file
+                                                    {value.files.length !== 1
+                                                      ? 's'
+                                                      : ''}
+                                                  </span>
+                                                )}
+                                              {value.uuid &&
+                                                !isPropertiesEditing && (
+                                                  <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                      handleOpenValueAttachmentModal(
+                                                        prop.uuid,
+                                                        value.uuid,
+                                                        idx,
+                                                        index
+                                                      )
+                                                    }
+                                                    className="h-6 px-2 text-xs"
+                                                  >
+                                                    <Upload className="h-3 w-3 mr-1" />
+                                                    Attach
+                                                  </Button>
+                                                )}
+                                            </div>
+                                          </div>
+
+                                          {/* Value Files */}
+                                          {value.files &&
+                                            value.files.length > 0 && (
+                                              <div className="border-t pt-2">
+                                                <FileList
+                                                  files={convertApiFilesToFileData(
+                                                    value.files
+                                                  )}
+                                                />
+                                              </div>
+                                            )}
+                                        </div>
+                                      )
+                                    )}
+
+                                    {(!prop.values ||
+                                      prop.values.length === 0) && (
+                                      <div className="text-sm text-muted-foreground italic">
+                                        No values defined
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        No properties defined for this object
+                      </p>
+                    )}
+                  </div>
+                )}
+                renderEdit={() => (
+                  <PropertySectionEditor
+                    properties={editedProperties}
+                    isEditable={true}
+                    onUpdate={setEditedProperties}
+                  />
+                )}
+              />
+
+              {/* Files Section */}
+              <Separator />
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <Label>Files</Label>
+                  {!isDeleted && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleOpenObjectFilesModal}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Files
+                    </Button>
+                  )}
+                </div>
+                <FileList files={convertApiFilesToFileData(files)} />
+              </div>
 
               {/* Object History Section */}
               {objectHistory && objectHistory.length > 0 && (
@@ -827,6 +1023,51 @@ export function ObjectDetailsSheet({
           onOpenChange={handleDeleteCancel}
           objectName={objectToDelete.name}
           onDelete={handleDeleteConfirm}
+        />
+      )}
+
+      {/* Object Files Attachment Modal */}
+      <AttachmentModal
+        open={isObjectFilesModalOpen}
+        onOpenChange={setIsObjectFilesModalOpen}
+        attachments={objectFiles}
+        onChange={handleObjectFilesChange}
+        title="Object Files"
+        uploadContext={{
+          objectUuid: object?.uuid,
+        }}
+        onUploadComplete={handleUploadComplete}
+      />
+
+      {/* Property/Value Attachment Modal */}
+      {attachmentModal.isOpen && object?.uuid && (
+        <AttachmentModal
+          open={attachmentModal.isOpen}
+          onOpenChange={handleCloseAttachmentModal}
+          attachments={attachmentModal.attachments || []} // Track modal-specific attachments
+          onChange={(newAttachments) => {
+            console.log('Attachments selected:', newAttachments)
+            // Update the modal state to track selected attachments
+            setAttachmentModal((prev) => ({
+              ...prev,
+              attachments: newAttachments,
+            }))
+          }}
+          title={
+            attachmentModal.type === 'property'
+              ? 'Attach Files to Property'
+              : 'Attach Files to Value'
+          }
+          uploadContext={{
+            objectUuid: object.uuid,
+            propertyUuid: attachmentModal.propertyUuid,
+            valueUuid: attachmentModal.valueUuid,
+          }}
+          onUploadComplete={() => {
+            console.log('Upload completed, refreshing data')
+            handleUploadComplete()
+            handleCloseAttachmentModal()
+          }}
         />
       )}
     </>

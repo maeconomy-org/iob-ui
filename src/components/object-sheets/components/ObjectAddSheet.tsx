@@ -261,23 +261,22 @@ export function ObjectAddSheet({
                       <div className="space-y-2">
                         <AttachmentList
                           attachments={field.value || []}
-                          onOpenAttachment={(att) => {
-                            if (att.mode === 'reference' && att.url) {
-                              window.open(
-                                att.url,
-                                '_blank',
-                                'noopener,noreferrer'
+                          onRemoveAttachment={(att) => {
+                            const currentAttachments = field.value || []
+                            const attachmentIndex =
+                              currentAttachments.findIndex(
+                                (a: any, index: number) =>
+                                  a.fileName === att.fileName &&
+                                  a.mode === att.mode &&
+                                  index === currentAttachments.indexOf(att)
                               )
-                            } else {
-                              // TODO: request a download URL for uploaded files
+                            if (attachmentIndex >= 0) {
+                              const next = [...currentAttachments]
+                              next.splice(attachmentIndex, 1)
+                              field.onChange(next)
                             }
                           }}
-                          onRemoveAttachment={(att) => {
-                            const next = (field.value || []).filter(
-                              (a: any) => a.uuid !== att.uuid
-                            )
-                            field.onChange(next)
-                          }}
+                          allowHardRemove={true}
                         />
                         <AttachmentModal
                           open={isObjectAttachmentsOpen}
