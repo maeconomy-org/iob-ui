@@ -43,8 +43,8 @@ export default function AuthPage() {
       }
 
       // Extract username from the response
-      const certFingerprint = response.base.data?.certFingerprint
-      const certCommonName = response.base.data?.certCommonName
+      const certFingerprint = response.base.data?.certificate.certificateSha256
+      const certCommonName = response.base.data?.certificate.subjectCommonName
       // If we get here, certificate was accepted
       setStatus('success')
 
