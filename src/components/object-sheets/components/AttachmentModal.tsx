@@ -1,18 +1,16 @@
 'use client'
 
-import { useState } from 'react'
-import { AttachmentSection } from './AttachmentSection'
-import type { Attachment } from '../utils/attachments'
+import { useState, useEffect, useRef } from 'react'
+import { toast } from 'sonner'
+
 import {
+  Button,
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
   DialogDescription,
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -21,11 +19,12 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+} from '@/components/ui'
 import { getUploadService } from '@/lib/upload-service'
 import { useIobClient } from '@/providers/query-provider'
-import { toast } from 'sonner'
-import { AlertDescription } from '@/components/ui'
+
+import { AttachmentSection } from './AttachmentSection'
+import type { Attachment } from '../utils/attachments'
 
 type AttachmentModalProps = {
   open: boolean
@@ -61,10 +60,33 @@ export function AttachmentModal({
   const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([])
   const [showUploadConfirm, setShowUploadConfirm] = useState(false)
   const client = useIobClient()
+  const initialAttachmentsRef = useRef<Attachment[]>([])
 
-  // Get all uploadable attachments (files with blob or reference)
+  // Capture initial state only when modal opens (not when attachments change)
+  useEffect(() => {
+    if (open) {
+      initialAttachmentsRef.current = [...attachments]
+    }
+  }, [open]) // Remove attachments dependency
+
+  // Handle modal close - clear state if user didn't submit
+  const handleModalClose = (isOpen: boolean) => {
+    if (!isOpen) {
+      // Reset to initial attachments if user closes without submitting
+      onChange(initialAttachmentsRef.current)
+    }
+    onOpenChange(isOpen)
+  }
+
+  // Get all uploadable attachments (NEW files only - exclude existing files with UUIDs)
   const getUploadableAttachments = (attachmentList: Attachment[]) => {
     const filtered = attachmentList.filter((att) => {
+      // Skip existing files that already have UUIDs (already uploaded/saved)
+      if (att.uuid) {
+        return false
+      }
+
+      // Only include NEW files that need to be uploaded
       const isUploadable =
         (att.mode === 'upload' && att.blob) ||
         (att.mode === 'reference' && (att.url || att.fileReference))
@@ -141,7 +163,7 @@ export function AttachmentModal({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog open={open} onOpenChange={handleModalClose}>
         <DialogContent className="sm:max-w-[640px]">
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>

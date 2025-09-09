@@ -209,7 +209,7 @@ export function useObjectOperations({
           } else {
             // Only reference files go to Aggregate API
             return {
-              fileName: file.fileName,
+              fileName: file.fileName || file.label || '',
               fileReference: file.url || file.fileReference || '',
               label: file.label,
               contentType: file.mimeType,
