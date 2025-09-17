@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ChevronRight, Plus, Trash2, X } from 'lucide-react'
 
 import { Button, Input, Label } from '@/components/ui'
+import { FileList } from '@/components/object-sheets/components/FileDisplay'
 
 interface CollapsiblePropertyProps {
   property: any
@@ -127,15 +128,24 @@ export function CollapsibleProperty({
           {/* Property Metadata - Only Key field */}
           <div className="mb-4">
             {isEditable ? (
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor={`property-key-${property.uuid || 'new'}`}>
-                  Key
+                  Property Name
                 </Label>
-                <Input
-                  id={`property-key-${property.uuid || 'new'}`}
-                  value={editedProperty.key}
-                  onChange={(e) => handleChange('key', e.target.value)}
-                />
+                <div className="flex items-center gap-2">
+                  <Input
+                    id={`property-key-${property.uuid || 'new'}`}
+                    value={editedProperty.key}
+                    onChange={(e) => handleChange('key', e.target.value)}
+                    placeholder="e.g. Total Floors"
+                    className="flex-1"
+                  />
+                </div>
+                {property.files && property.files.length > 0 && (
+                  <div className="mt-2">
+                    <FileList files={property.files} />
+                  </div>
+                )}
               </div>
             ) : (
               property.uuid && (
@@ -151,34 +161,38 @@ export function CollapsibleProperty({
           <div>
             <h4 className="font-medium mb-2">Values</h4>
 
-            <div className="space-y-2">
+            <div className="space-y-4">
               {(editedProperty.values || []).map(
                 (value: any, index: number) => (
-                  <div
-                    key={value.uuid || `new-${index}`}
-                    className="flex items-center"
-                  >
+                  <div key={value.uuid || `new-${index}`} className="space-y-2">
                     {isEditable ? (
-                      <>
+                      <div className="flex items-center gap-2">
                         <Input
                           value={value.value || ''}
                           onChange={(e) =>
                             handleValueChange(index, e.target.value)
                           }
+                          placeholder="Enter property value"
                           className="flex-1"
                         />
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => handleRemoveValue(index)}
-                          className="ml-2"
                         >
                           <X className="h-4 w-4" />
                         </Button>
-                      </>
+                      </div>
                     ) : (
                       <div className="p-2 border rounded-md bg-background w-full">
                         {value.value}
+                      </div>
+                    )}
+
+                    {/* Value-level Files */}
+                    {value.files && value.files.length > 0 && (
+                      <div className="mt-2">
+                        <FileList files={value.files} />
                       </div>
                     )}
                   </div>

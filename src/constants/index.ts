@@ -23,7 +23,7 @@ export const FOOTER_LINKS = [
 ]
 
 // Contact information
-export const SUPPORT_EMAIL = 'support@internetofbuildings.com'
+export const SUPPORT_EMAIL = 'support@internetofmaterials.com'
 export const CONTACT_URL = 'https://example.com/contact'
 
 // -------------------------------------------------------

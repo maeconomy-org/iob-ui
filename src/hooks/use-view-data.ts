@@ -209,8 +209,6 @@ export function useViewData({
 
       // Always fetch fresh data to avoid stale cache issues
       // When children are added/removed, we want to see the latest data
-      // TODO: Refactor to use useAggregate hook instead of direct client
-      // This requires restructuring how loadChildren works since hooks can't be used in async functions
       const response = await client.aggregate.getAggregateEntities({
         parentUUID,
         hasParentUUIDFilter: true,
