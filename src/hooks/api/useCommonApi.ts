@@ -1,6 +1,7 @@
+import { AggregateFindDTO } from 'iob-client'
+
 import { useMutation } from '@tanstack/react-query'
 import { useIobClient } from '@/providers/query-provider'
-import { AggregateEntity, AggregateFindDTO } from 'iob-client'
 
 export function useCommonApi() {
   const client = useIobClient()

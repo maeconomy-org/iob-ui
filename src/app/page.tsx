@@ -43,8 +43,8 @@ export default function AuthPage() {
       }
 
       // Extract username from the response
-      const certFingerprint = response.base.data?.certFingerprint
-      const certCommonName = response.base.data?.certCommonName
+      const certFingerprint = response.base.data?.certificate.certificateSha256
+      const certCommonName = response.base.data?.certificate.subjectCommonName
       // If we get here, certificate was accepted
       setStatus('success')
 
@@ -68,7 +68,7 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="flex flex-1 items-center justify-center bg-gray-50">
+    <div className="flex flex-1 items-center justify-center">
       <div className="max-w-md w-full space-y-6 p-8">
         <div className="text-center">
           <h1 className="text-3xl font-bold">Welcome to {APP_ACRONYM}</h1>

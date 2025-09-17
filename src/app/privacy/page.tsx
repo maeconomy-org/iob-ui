@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft } from 'lucide-react'
+import { APP_NAME, SUPPORT_EMAIL } from '@/constants'
 
 export default function PrivacyPage() {
   return (
@@ -25,10 +26,10 @@ export default function PrivacyPage() {
         <section className="space-y-4">
           <h2 className="text-xl font-semibold">Introduction</h2>
           <p>
-            Internet of Buildings ("we", "our", or "us") is committed to
-            protecting your privacy. This Privacy Policy explains how we
-            collect, use, and share information about you when you use our
-            materials management system and related services.
+            {APP_NAME} ("we", "our", or "us") is committed to protecting your
+            privacy. This Privacy Policy explains how we collect, use, and share
+            information about you when you use our materials management system
+            and related services.
           </p>
         </section>
 
@@ -74,7 +75,7 @@ export default function PrivacyPage() {
             If you have any questions or concerns about this Privacy Policy or
             our data practices, please contact us at:
           </p>
-          <p className="font-medium">support@internetofbuildings.com</p>
+          <p className="font-medium">{SUPPORT_EMAIL}</p>
         </section>
       </div>
     </div>

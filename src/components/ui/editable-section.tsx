@@ -92,9 +92,7 @@ export function EditableSection({
         )}
       </div>
 
-      <div className="bg-card rounded-md border p-4">
-        {isEditing ? renderEdit() : renderDisplay()}
-      </div>
+      <div>{isEditing ? renderEdit() : renderDisplay()}</div>
     </div>
   )
 }

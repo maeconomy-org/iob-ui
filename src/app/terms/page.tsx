@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft } from 'lucide-react'
+import { APP_NAME, SUPPORT_EMAIL } from '@/constants'
 
 export default function TermsPage() {
   return (
@@ -25,8 +26,8 @@ export default function TermsPage() {
         <section className="space-y-4">
           <h2 className="text-xl font-semibold">1. Acceptance of Terms</h2>
           <p>
-            By accessing or using the Internet of Buildings materials management
-            system ("Service"), you agree to be bound by these Terms of Service
+            By accessing or using the {APP_NAME} materials management system
+            ("Service"), you agree to be bound by these Terms of Service
             ("Terms"). If you do not agree to these Terms, please do not use the
             Service.
           </p>
@@ -58,9 +59,9 @@ export default function TermsPage() {
         <section className="space-y-4">
           <h2 className="text-xl font-semibold">4. Limitation of Liability</h2>
           <p>
-            To the maximum extent permitted by law, Internet of Buildings shall
-            not be liable for any indirect, incidental, special, consequential,
-            or punitive damages, including but not limited to, loss of profits,
+            To the maximum extent permitted by law, {APP_NAME} shall not be
+            liable for any indirect, incidental, special, consequential, or
+            punitive damages, including but not limited to, loss of profits,
             data, or use, arising out of or in any way connected with the use of
             or inability to use the Service.
           </p>
@@ -82,7 +83,7 @@ export default function TermsPage() {
           <p>
             If you have any questions about these Terms, please contact us at:
           </p>
-          <p className="font-medium">support@internetofbuildings.com</p>
+          <p className="font-medium">{SUPPORT_EMAIL}</p>
         </section>
       </div>
     </div>

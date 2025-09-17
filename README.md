@@ -1,4 +1,4 @@
-# IoB (Internet of Buildings)
+# IoM (Internet of Materials)
 
 A modern web application for tracking and managing building materials, components, and structures for government and municipal use.
 
