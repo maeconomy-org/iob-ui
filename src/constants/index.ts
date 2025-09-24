@@ -9,18 +9,12 @@ export const AUTH_SESSION_TIMEOUT = 12 * 60 * 60 * 1000 // 12 hours in milliseco
 
 // Navigation
 export const NAV_ITEMS = [
-  // { name: 'Object Models', path: '/object-models' },
   { name: 'Objects', path: '/objects' },
   { name: 'Import', path: '/import' },
-  // { name: 'Process', path: '/process' },
 ]
 
 // Footer links
-export const FOOTER_LINKS = [
-  { name: 'Help', path: '/help' },
-  // { name: 'Privacy', path: '/privacy' },
-  // { name: 'Terms', path: '/terms' },
-]
+export const FOOTER_LINKS = [{ name: 'Help', path: '/help' }]
 
 // Contact information
 export const SUPPORT_EMAIL = 'support@internetofmaterials.com'
