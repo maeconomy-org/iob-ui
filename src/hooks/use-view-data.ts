@@ -1,23 +1,14 @@
 'use client'
 
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+
 import { useAggregate } from '@/hooks'
 import { ViewType } from '@/components/view-selector'
-import { usePagination } from './use-pagination'
-import { useAuth } from '@/contexts/auth-context'
 import { useSearch } from '@/contexts/search-context'
 import { useIobClient } from '@/providers/query-provider'
 
-// Interface for pagination info (matches existing)
-interface PaginationInfo {
-  currentPage: number
-  totalPages: number
-  totalElements: number
-  pageSize: number
-  isFirstPage: boolean
-  isLastPage: boolean
-}
+import { usePagination } from './use-pagination'
 
 // Interface for table view data with internal data fetching
 interface TableViewData {
@@ -79,7 +70,6 @@ export function useViewData({
   columnsPageSize = 15, // Same as child pagination for consistency
 }: UseViewDataProps): ViewData {
   const { useAggregateEntities } = useAggregate()
-  const { certFingerprint } = useAuth()
   const { isSearchMode, searchViewResults, searchPagination } = useSearch()
   const queryClient = useQueryClient()
   const client = useIobClient() // TODO: Remove when loadChildren is refactored
@@ -122,7 +112,6 @@ export function useViewData({
     {
       page: currentPage,
       size: pageSize,
-      createdBy: certFingerprint,
       hasParentUUIDFilter: true, // Only root objects
     },
     {
@@ -213,16 +202,10 @@ export function useViewData({
         parentUUID,
         hasParentUUIDFilter: true,
         page: apiPage,
-        size: 20, // Reasonable size for child loading per page
-        createdBy: certFingerprint,
-        // Add search parameter if provided
+        size: 20,
         ...(searchTerm &&
           searchTerm.trim() && { searchTerm: searchTerm.trim() }),
       })
-
-      console.log(
-        `✅ Fetched ${response.data?.content?.length || 0} children for parent: ${parentUUID}${searchTerm ? ` (search: "${searchTerm}")` : ''}`
-      )
 
       // Cache the result with timestamp for better cache management
       const queryKey = [

@@ -16,6 +16,10 @@ interface AuthData {
   timestamp: number
   certCommonName?: string
   certFingerprint?: string
+  userUuid?: string
+  certValidFrom?: string // Certificate validity start date
+  certValidTo?: string // Certificate validity end date
+  certSerialNumber?: string // Certificate serial number
 }
 
 // Auth context type
@@ -23,6 +27,10 @@ interface AuthContextType {
   isAuthenticated: boolean
   certCommonName: string | undefined
   certFingerprint: string | undefined
+  userUuid: string | undefined
+  certValidFrom: string | undefined
+  certValidTo: string | undefined
+  certSerialNumber: string | undefined
   login: (authData: AuthData) => void
   logout: () => void
   checkAuth: () => boolean
@@ -33,6 +41,10 @@ const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
   certCommonName: undefined,
   certFingerprint: undefined,
+  userUuid: undefined,
+  certValidFrom: undefined,
+  certValidTo: undefined,
+  certSerialNumber: undefined,
   login: () => {},
   logout: () => {},
   checkAuth: () => false,
@@ -51,6 +63,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     undefined
   )
   const [certFingerprint, setCertFingerprint] = useState<string | undefined>(
+    undefined
+  )
+  const [userUuid, setUserUuid] = useState<string | undefined>(undefined)
+  const [certValidFrom, setCertValidFrom] = useState<string | undefined>(
+    undefined
+  )
+  const [certValidTo, setCertValidTo] = useState<string | undefined>(undefined)
+  const [certSerialNumber, setCertSerialNumber] = useState<string | undefined>(
     undefined
   )
 
@@ -82,6 +102,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
             setIsAuthenticated(true)
             setCertCommonName(parsed.certCommonName)
             setCertFingerprint(parsed.certFingerprint)
+            setUserUuid(parsed.userUuid)
+            setCertValidFrom(parsed.certValidFrom)
+            setCertValidTo(parsed.certValidTo)
+            setCertSerialNumber(parsed.certSerialNumber)
             return true
           }
         }
@@ -93,6 +117,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setIsAuthenticated(false)
     setCertCommonName(undefined)
     setCertFingerprint(undefined)
+    setUserUuid(undefined)
+    setCertValidFrom(undefined)
+    setCertValidTo(undefined)
+    setCertSerialNumber(undefined)
     return false
   }
 
@@ -103,6 +131,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setIsAuthenticated(true)
     setCertCommonName(authData.certCommonName)
     setCertFingerprint(authData.certFingerprint)
+    setUserUuid(authData.userUuid)
+    setCertValidFrom(authData.certValidFrom)
+    setCertValidTo(authData.certValidTo)
+    setCertSerialNumber(authData.certSerialNumber)
   }
 
   // Logout function
@@ -111,6 +143,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setIsAuthenticated(false)
     setCertCommonName(undefined)
     setCertFingerprint(undefined)
+    setUserUuid(undefined)
+    setCertValidFrom(undefined)
+    setCertValidTo(undefined)
+    setCertSerialNumber(undefined)
     router.push('/')
   }
 
@@ -120,6 +156,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
         isAuthenticated,
         certCommonName,
         certFingerprint,
+        userUuid,
+        certValidFrom,
+        certValidTo,
+        certSerialNumber,
         login,
         logout,
         checkAuth,

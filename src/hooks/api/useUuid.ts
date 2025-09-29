@@ -1,4 +1,6 @@
-import { useMutation } from '@tanstack/react-query'
+import type { UUID } from 'iob-client'
+import { useMutation, useQuery } from '@tanstack/react-query'
+
 import { useIobClient } from '@/providers/query-provider'
 
 export function useUuid() {
@@ -14,11 +16,47 @@ export function useUuid() {
     })
   }
 
-  // Get UUIDs owned by the current user
-  const useOwnedUuids = () => {
-    return useMutation({
-      mutationFn: async () => {
+  // Get UUIDs owned by the current user (query, not mutation)
+  const useOwnedUuids = (options = {}) => {
+    return useQuery({
+      queryKey: ['uuid', 'owned'],
+      queryFn: async () => {
         const response = await client.uuid.getOwned()
+        return response.data
+      },
+      ...options,
+    })
+  }
+
+  // Get specific UUID record
+  const useUuidRecord = (uuid: UUID, options = {}) => {
+    return useQuery({
+      queryKey: ['uuid', 'record', uuid],
+      queryFn: async () => {
+        if (!uuid) return null
+        const response = await client.uuid.getRecord(uuid)
+        return response.data
+      },
+      enabled: !!uuid,
+      ...options,
+    })
+  }
+
+  // Update UUID metadata
+  const useUpdateUuidMeta = () => {
+    return useMutation({
+      mutationFn: async (params: { uuid: UUID; nodeType: string }) => {
+        const response = await client.uuid.updateRecordMeta(params)
+        return response.data
+      },
+    })
+  }
+
+  // Authorize UUID access
+  const useAuthorizeUuid = () => {
+    return useMutation({
+      mutationFn: async (params: { userUuid: UUID; resourceId: UUID }) => {
+        const response = await client.uuid.authorize(params)
         return response.data
       },
     })
@@ -27,5 +65,8 @@ export function useUuid() {
   return {
     useGenerateUuid,
     useOwnedUuids,
+    useUuidRecord,
+    useUpdateUuidMeta,
+    useAuthorizeUuid,
   }
 }

@@ -50,101 +50,117 @@ export function TablePagination({
   const startItem = currentPage * pageSize + 1
   const endItem = Math.min((currentPage + 1) * pageSize, totalElements)
 
+  // Determine max page numbers to show based on screen size
+  const getMaxPageNumbers = () => {
+    // On mobile (< 640px), show fewer page numbers to prevent overflow
+    // This is handled by CSS classes but we also limit the logic here
+    return totalPages <= 3 ? totalPages : 3 // Show max 3 pages on mobile-first design
+  }
+
+  const maxPageNumbers = getMaxPageNumbers()
+
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-2 py-4">
-      {/* Results info */}
-      <div className="text-sm text-muted-foreground">
+    <div className="flex flex-col gap-3 px-2 py-4">
+      {/* Results info - always visible on top on mobile */}
+      <div className="text-sm text-muted-foreground text-center sm:text-left">
         Showing {startItem}-{endItem} of {totalElements} results
       </div>
 
-      {/* Pagination controls */}
-      <div className="flex items-center gap-3">
-        {/* First page button */}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onFirst}
-          disabled={isFirstPage}
-          className="size-10"
-          title="First page"
-        >
-          <ChevronsLeft className="h-4 w-4" />
-        </Button>
+      {/* Main pagination controls */}
+      <div className="flex items-center justify-center gap-1 sm:gap-2">
+        {/* First and Previous buttons */}
+        <div className="flex items-center gap-1">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onFirst}
+            disabled={isFirstPage}
+            className="h-8 w-8 sm:h-10 sm:w-10 p-0"
+            title="First page"
+          >
+            <ChevronsLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+          </Button>
 
-        {/* Previous page button */}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onPrevious}
-          disabled={isFirstPage}
-          className="size-10"
-          title="Previous page"
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onPrevious}
+            disabled={isFirstPage}
+            className="h-8 w-8 sm:h-10 sm:w-10 p-0"
+            title="Previous page"
+          >
+            <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+          </Button>
+        </div>
 
-        {/* Page numbers */}
-        <Pagination>
-          <PaginationContent>
-            {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
-              let pageNum: number
+        {/* Page numbers - responsive design */}
+        <div className="flex items-center">
+          <Pagination>
+            <PaginationContent className="gap-1">
+              {Array.from(
+                { length: Math.min(totalPages, maxPageNumbers) },
+                (_, i) => {
+                  let pageNum: number
 
-              if (totalPages <= 7) {
-                // Show all pages if 7 or fewer
-                pageNum = i
-              } else if (currentPage <= 3) {
-                // Show first 7 pages
-                pageNum = i
-              } else if (currentPage >= totalPages - 4) {
-                // Show last 7 pages
-                pageNum = totalPages - 7 + i
-              } else {
-                // Show pages around current page
-                pageNum = currentPage - 3 + i
-              }
+                  if (totalPages <= maxPageNumbers) {
+                    // Show all pages if within limit
+                    pageNum = i
+                  } else if (currentPage <= 1) {
+                    // Show first pages
+                    pageNum = i
+                  } else if (currentPage >= totalPages - 2) {
+                    // Show last pages
+                    pageNum = totalPages - maxPageNumbers + i
+                  } else {
+                    // Show pages around current page
+                    pageNum = currentPage - 1 + i
+                  }
 
-              return (
-                <PaginationItem key={pageNum}>
-                  <PaginationLink
-                    onClick={() => onPageChange(pageNum)}
-                    isActive={currentPage === pageNum}
-                    className="cursor-pointer size-10"
-                  >
-                    {pageNum + 1}
-                  </PaginationLink>
-                </PaginationItem>
-              )
-            })}
-          </PaginationContent>
-        </Pagination>
+                  return (
+                    <PaginationItem key={pageNum}>
+                      <PaginationLink
+                        onClick={() => onPageChange(pageNum)}
+                        isActive={currentPage === pageNum}
+                        className="cursor-pointer h-8 w-8 sm:h-10 sm:w-10 p-0 text-xs sm:text-sm"
+                      >
+                        {pageNum + 1}
+                      </PaginationLink>
+                    </PaginationItem>
+                  )
+                }
+              )}
+            </PaginationContent>
+          </Pagination>
+        </div>
 
-        {/* Next page button */}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onNext}
-          disabled={isLastPage}
-          className="size-10"
-          title="Next page"
-        >
-          <ChevronRight className="h-4 w-4" />
-        </Button>
+        {/* Next and Last buttons */}
+        <div className="flex items-center gap-1">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onNext}
+            disabled={isLastPage}
+            className="h-8 w-8 sm:h-10 sm:w-10 p-0"
+            title="Next page"
+          >
+            <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
+          </Button>
 
-        {/* Last page button */}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onLast}
-          disabled={isLastPage}
-          className="size-10"
-          title="Last page"
-        >
-          <ChevronsRight className="h-4 w-4" />
-        </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onLast}
+            disabled={isLastPage}
+            className="h-8 w-8 sm:h-10 sm:w-10 p-0"
+            title="Last page"
+          >
+            <ChevronsRight className="h-3 w-3 sm:h-4 sm:w-4" />
+          </Button>
+        </div>
       </div>
 
-      {/* Page info */}
-      <div className="text-sm text-muted-foreground">
+      {/* Page info - more compact on mobile */}
+      <div className="text-xs sm:text-sm text-muted-foreground text-center">
         Page {currentPage + 1} of {totalPages}
       </div>
     </div>

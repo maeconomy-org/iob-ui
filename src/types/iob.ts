@@ -1,59 +1,16 @@
 /**
- * IoB Types
- * This file extends and re-exports types from the iob-client package
- * for use throughout the application.
+ * Local IoB Types
+ * This file contains application-specific types that extend the iob-client package.
+ * For base types, import directly from 'iob-client' instead of re-exporting here.
  */
 
 import type {
-  UUID,
   UUObjectDTO,
   UUPropertyDTO,
   UUPropertyValueDTO,
   UUFileDTO,
-  UUStatementDTO,
-  Predicate,
-  UUObjectWithProperties,
-  ComplexObjectCreationInput,
-  ComplexObjectOutput,
-  ApiResponse,
-  ApiError,
-  IOBClientConfig,
-  // New aggregate types
-  AggregateEntity,
-  AggregateProperty,
-  AggregateFile,
-  AggregateFindDTO,
-  PageAggregateEntity,
-  QueryParams,
-  StatementQueryParams,
-  AuthResponse,
+  UUID,
 } from 'iob-client'
-
-// Re-export all types from the iob-client package
-export type {
-  UUID,
-  UUObjectDTO,
-  UUPropertyDTO,
-  UUPropertyValueDTO,
-  UUFileDTO,
-  UUStatementDTO,
-  Predicate,
-  UUObjectWithProperties,
-  ComplexObjectCreationInput,
-  ComplexObjectOutput,
-  ApiResponse,
-  ApiError,
-  IOBClientConfig,
-  // New aggregate types
-  AggregateEntity,
-  AggregateProperty,
-  AggregateFile,
-  AggregateFindDTO,
-  PageAggregateEntity,
-  QueryParams,
-  StatementQueryParams,
-  AuthResponse,
-}
 
 /**
  * Object update input type for the updateObject API

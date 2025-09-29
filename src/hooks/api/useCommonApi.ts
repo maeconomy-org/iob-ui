@@ -1,24 +1,24 @@
-import { AggregateFindDTO } from 'iob-client'
-
 import { useMutation } from '@tanstack/react-query'
+import { AggregateFindDTO, AuthResponse } from 'iob-client'
+
 import { useIobClient } from '@/providers/query-provider'
 
 export function useCommonApi() {
   const client = useIobClient()
 
-  // Request a certificate
+  // Request certificate authentication (both base and UUID auth)
   const useRequestCertificate = () => {
     return useMutation({
       mutationFn: async (): Promise<{
-        base: any
-        uuid: any
+        base: AuthResponse
+        uuid: AuthResponse
       }> => {
         const baseAuthResponse = await client.auth.requestBaseAuth()
         const uuidAuthResponse = await client.auth.requestUuidAuth()
 
         return {
-          base: { ...baseAuthResponse },
-          uuid: { ...uuidAuthResponse },
+          base: baseAuthResponse.data as AuthResponse,
+          uuid: uuidAuthResponse.data as AuthResponse,
         }
       },
     })
@@ -35,7 +35,7 @@ export function useCommonApi() {
   }
 
   return {
-    useRequestCertificate,
+    useRequestCertificate, // Consolidated auth method for both base and UUID
     useSearch,
   }
 }

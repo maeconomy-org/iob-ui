@@ -84,8 +84,17 @@ export function getSoftDeleteInfo(object: any) {
     deletedAt: object?.softDeletedAt
       ? new Date(object.softDeletedAt).toLocaleString()
       : null,
-    deletedBy: object?.softDeleteBy || null,
+    deletedBy: extractUserUUID(object?.softDeleteBy),
   }
+}
+
+/**
+ * Extract user UUID from user object or return the value if it's already a string
+ */
+export function extractUserUUID(userField: any): string | null {
+  if (!userField) return null
+  if (typeof userField === 'string') return userField
+  return userField.userUUID || userField.uuid || null
 }
 
 /**
@@ -107,6 +116,5 @@ export function formatSoftDeleteBy(
 
   if (deleteBy.length <= maxLength) return deleteBy
 
-  // Show the end of the string (usually more meaningful for UUIDs/usernames)
   return `...${deleteBy.substring(deleteBy.length - maxLength)}`
 }

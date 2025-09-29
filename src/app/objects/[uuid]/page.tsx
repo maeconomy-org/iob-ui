@@ -4,13 +4,12 @@ import { useState, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { PlusCircle, ArrowLeft } from 'lucide-react'
 
+import { useAggregate } from '@/hooks'
 import { Button } from '@/components/ui'
 import { ObjectsTable } from '@/components/tables'
-import { ObjectDetailsSheet, ObjectAddSheet } from '@/components/object-sheets'
-import { useAggregate } from '@/hooks'
 import { isObjectDeleted } from '@/lib/object-utils'
 import ProtectedRoute from '@/components/protected-route'
-import { useAuth } from '@/contexts/auth-context'
+import { ObjectDetailsSheet, ObjectAddSheet } from '@/components/object-sheets'
 
 function ObjectChildrenPageContent() {
   const params = useParams()
@@ -20,8 +19,6 @@ function ObjectChildrenPageContent() {
   // Pagination state for children
   const [currentPage, setCurrentPage] = useState(0)
   const [pageSize] = useState(15)
-
-  const { certFingerprint } = useAuth()
 
   // Hooks
   const { useAggregateByUUID, useAggregateEntities } = useAggregate()
@@ -42,7 +39,6 @@ function ObjectChildrenPageContent() {
         hasParentUUIDFilter: true,
         page: currentPage,
         size: pageSize,
-        createdBy: certFingerprint,
       },
       {
         enabled: !!parentUuid,
@@ -81,29 +77,7 @@ function ObjectChildrenPageContent() {
   const isFirstPage = childrenResponse?.first ?? true
   const isLastPage = childrenResponse?.last ?? true
 
-  // Handlers
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page)
-  }
-
-  const handlePrevious = () => {
-    if (!isFirstPage) {
-      setCurrentPage(currentPage - 1)
-    }
-  }
-
-  const handleNext = () => {
-    if (!isLastPage) {
-      setCurrentPage(currentPage + 1)
-    }
-  }
-
   const handleViewObject = (object: any) => {
-    setSelectedObject(object)
-    setIsObjectSheetOpen(true)
-  }
-
-  const handleEditObject = (object: any) => {
     setSelectedObject(object)
     setIsObjectSheetOpen(true)
   }

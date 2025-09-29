@@ -21,7 +21,6 @@ export async function processImportJob(jobId: string) {
     }
 
     const totalChunks = parseInt(jobData.totalChunks || '0')
-    const total = parseInt(jobData.total || '0')
     let processed = parseInt(jobData.processed || '0')
     let failed = parseInt(jobData.failed || '0')
 
@@ -30,9 +29,6 @@ export async function processImportJob(jobId: string) {
 
     // Get batch size from environment or use default (50)
     const batchSize = parseInt(process.env.API_BATCH_SIZE || '50')
-
-    // Get user fingerprint from job data (should be set when job is created)
-    const userFingerprint = jobData.userFingerprint || 'defaultFingerprint'
 
     // Determine certificate verification behavior
     const shouldVerifyCerts = process.env.VERIFY_CERTIFICATES === 'true'
@@ -43,9 +39,6 @@ export async function processImportJob(jobId: string) {
       rejectUnauthorized: shouldVerifyCerts, // Controlled by environment
       fallbackToInsecure: true,
     })
-
-    // Debug certificate info
-    console.log(`Job ${jobId}: Starting import with ${userFingerprint}`)
 
     // Test certificate availability
     const certInfo = getCertificateInfo()
@@ -59,7 +52,6 @@ export async function processImportJob(jobId: string) {
       timeout: 120000, // Increase to 2 minutes for large batches
       headers: {
         'Content-Type': 'application/json',
-        createdBy: userFingerprint,
       },
     })
 
@@ -85,15 +77,30 @@ export async function processImportJob(jobId: string) {
       `Job ${jobId}: Processing ${allObjects.length} objects in batches of ${batchSize}`
     )
 
+    // Get user UUID from job metadata
+    const userUuid = jobData.userUuid
+
+    if (!userUuid) {
+      throw new Error('User UUID not found in job metadata')
+    }
+
     // Process objects in batches
     for (let i = 0; i < allObjects.length; i += batchSize) {
       const batch = allObjects.slice(i, i + batchSize)
 
       try {
+        // Wrap data with user info as required by the new API structure
+        const payload = {
+          aggregateEntityList: batch,
+          user: {
+            userUuid,
+          },
+        }
+
         // Send batch to Java backend API using axios
         const response = await axiosInstance.post(
           `${API_CONFIG.baseUrl}/api/Aggregate/Import`,
-          batch
+          payload
         )
 
         console.log(

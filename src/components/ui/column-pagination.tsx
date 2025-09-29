@@ -74,7 +74,7 @@ export function ColumnPagination({
             disabled={currentPage <= 1 || loading}
             className="size-8 p-0"
           >
-            <ChevronsLeft className="size-10" />
+            <ChevronsLeft className="h-4 w-4" />
           </Button>
           <Button
             variant="ghost"
@@ -85,7 +85,7 @@ export function ColumnPagination({
             disabled={currentPage <= 1 || loading}
             className="size-8 p-0"
           >
-            <ChevronLeft className="size-10" />
+            <ChevronLeft className="h-4 w-4" />
           </Button>
         </>
       )}
@@ -133,7 +133,7 @@ export function ColumnPagination({
             disabled={currentPage >= totalPages || loading}
             className="size-8 p-0"
           >
-            <ChevronRight className="size-10" />
+            <ChevronRight className="h-4 w-4" />
           </Button>
           <Button
             variant="ghost"
@@ -144,7 +144,7 @@ export function ColumnPagination({
             disabled={currentPage >= totalPages || loading}
             className="size-8 p-0"
           >
-            <ChevronsRight className="size-10" />
+            <ChevronsRight className="h-4 w-4" />
           </Button>
         </>
       )}
