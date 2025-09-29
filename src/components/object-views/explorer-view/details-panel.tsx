@@ -23,6 +23,7 @@ import {
   CopyButton,
 } from '@/components/ui'
 import { PropertySectionEditor } from '@/components/properties'
+import { extractUserUUID } from '@/components/object-sheets/utils/objectUtils'
 import { useObjects, usePropertyManagement } from '@/hooks'
 import { formatPropertyValue } from '@/lib/object-utils'
 import { ObjectItem } from './tree-item'
@@ -217,7 +218,7 @@ export function DetailsPanel({
   const deletedMetadata = isDeleted
     ? {
         deletedAt: item.softDeletedAt,
-        deletedBy: item.softDeleteBy,
+        deletedBy: extractUserUUID(item.softDeleteBy),
       }
     : null
 

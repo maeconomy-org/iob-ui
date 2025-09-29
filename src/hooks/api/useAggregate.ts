@@ -1,10 +1,13 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { AggregateFindDTO } from 'iob-client'
 
 import { useIobClient } from '@/providers/query-provider'
+import { useAuth } from '@/contexts/auth-context'
 
 export function useAggregate() {
   const client = useIobClient()
+  const queryClient = useQueryClient()
+  const { userUuid } = useAuth()
 
   // Get aggregate entity by UUID (rich data with all relationships)
   const useAggregateByUUID = (uuid: string, options = {}) => {
@@ -32,7 +35,7 @@ export function useAggregate() {
     })
   }
 
-  // Get all aggregate entities without pagination (convenience method)
+  // Get all aggregate entities without pagination
   const useAllAggregateEntities = (options = {}) => {
     return useQuery({
       queryKey: ['aggregates', 'all'],
@@ -47,20 +50,17 @@ export function useAggregate() {
     })
   }
 
-  // Search aggregate entities by creator
-  const useAggregateEntitiesByCreator = (createdBy: string, options = {}) => {
+  // Get aggregate entities for current user
+  const useUserAggregateEntities = (options = {}) => {
     return useQuery({
-      queryKey: ['aggregates', 'creator', createdBy],
+      queryKey: ['aggregates', 'user'],
       queryFn: async () => {
-        if (!createdBy) return null
         const response = await client.aggregate.getAggregateEntities({
-          createdBy,
           page: 0,
           size: 1000,
         })
         return response.data
       },
-      enabled: !!createdBy,
       ...options,
     })
   }
@@ -83,11 +83,67 @@ export function useAggregate() {
     })
   }
 
+  // Create aggregate object
+  const useCreateAggregateObject = () => {
+    return useMutation({
+      mutationFn: async (aggregateEntityList: any[]) => {
+        if (!userUuid) {
+          throw new Error('User UUID is required for aggregate creation')
+        }
+
+        // Wrap the data with user info as required by the new API structure
+        const payload = {
+          aggregateEntityList,
+          user: {
+            userUuid,
+          },
+        }
+
+        const response = await client.aggregate.createAggregateObject(payload)
+        return response.data
+      },
+      onSuccess: () => {
+        // Invalidate aggregate queries to refresh data
+        queryClient.invalidateQueries({ queryKey: ['aggregates'] })
+        queryClient.invalidateQueries({ queryKey: ['objects'] })
+      },
+    })
+  }
+
+  // Import aggregate objects
+  const useImportAggregateObjects = () => {
+    return useMutation({
+      mutationFn: async (aggregateEntityList: any[]) => {
+        if (!userUuid) {
+          throw new Error('User UUID is required for aggregate import')
+        }
+
+        // Wrap the data with user info as required by the new API structure
+        const payload = {
+          aggregateEntityList,
+          user: {
+            userUuid,
+          },
+        }
+
+        const response = await client.aggregate.importAggregateObjects(payload)
+        return response.data
+      },
+      onSuccess: () => {
+        // Invalidate aggregate queries to refresh data
+        queryClient.invalidateQueries({ queryKey: ['aggregates'] })
+        queryClient.invalidateQueries({ queryKey: ['objects'] })
+      },
+    })
+  }
+
   return {
     useAggregateByUUID,
     useAggregateEntities,
     useAllAggregateEntities,
-    useAggregateEntitiesByCreator,
+    useUserAggregateEntities,
     useAggregateEntitiesWithHistory,
+    useCreateAggregateObject,
+    useImportAggregateObjects,
   }
 }

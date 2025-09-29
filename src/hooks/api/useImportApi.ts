@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useIobClient } from '@/providers/query-provider'
+import { useAuth } from '@/contexts/auth-context'
 
 /**
  * Import API object structure based on the provided schema
@@ -72,11 +73,21 @@ export interface ImportResult {
 export function useImportApi() {
   const client = useIobClient()
   const queryClient = useQueryClient()
+  const { userUuid } = useAuth()
 
   const importSingleObject = useMutation({
     mutationFn: async (objectData: ImportObjectData): Promise<any> => {
-      const response = await client.aggregate.createAggregateObject(objectData)
+      if (!userUuid) {
+        throw new Error('User UUID is required for import')
+      }
 
+      // Wrap data with required structure
+      const payload = {
+        aggregateEntityList: [objectData],
+        user: { userUuid },
+      }
+
+      const response = await client.aggregate.createAggregateObject(payload)
       return response.data
     },
     onSuccess: () => {

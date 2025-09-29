@@ -6,12 +6,33 @@ import redis from '@/lib/redis'
 // Handle initial chunk upload and session start
 export async function POST(req: Request) {
   try {
-    const { chunk, total, chunkIndex, totalChunks, sessionId } =
-      await req.json()
+    // Parse the request body with new structure
+    const body = await req.json()
+    const {
+      aggregateEntityList,
+      user,
+      total,
+      chunkIndex,
+      totalChunks,
+      sessionId,
+    } = body
+
+    // Validate user UUID in payload
+    if (!user?.userUuid) {
+      return NextResponse.json(
+        { error: 'User UUID is required in payload' },
+        { status: 400 }
+      )
+    }
+
+    const userUuid = user.userUuid
+    const chunk = aggregateEntityList
 
     if (!Array.isArray(chunk) || chunk.length === 0) {
       return NextResponse.json(
-        { error: 'Invalid chunk: must be a non-empty array' },
+        {
+          error: 'Invalid chunk: aggregateEntityList must be a non-empty array',
+        },
         { status: 400 }
       )
     }
@@ -29,14 +50,11 @@ export async function POST(req: Request) {
 
     // Generate or use session ID
     const jobId = sessionId || crypto.randomUUID()
-
-    // Get user fingerprint from headers
-    const userFingerprint = req.headers.get('createdBy')
     // If this is the first chunk, initialize the job
     if (chunkIndex === 0 && !sessionId) {
       await redis.hset(`import:${jobId}`, {
         status: 'receiving',
-        userFingerprint: userFingerprint,
+        userUuid: userUuid,
         total: total.toString(),
         processed: '0',
         failed: '0',

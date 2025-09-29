@@ -2,9 +2,8 @@
 
 import { useState, useCallback } from 'react'
 import type { UUPropertyDTO, UUPropertyValueDTO } from 'iob-client'
-import { Predicate } from 'iob-client'
 
-import { useProperties, useStatements } from './api'
+import { useProperties } from './api'
 
 /**
  * A hook that provides comprehensive property management functions
@@ -14,15 +13,13 @@ export function usePropertyManagement(objectUuid?: string) {
     useUpdatePropertyWithValues,
     useAddPropertyToObject,
     useSetPropertyValue,
+    useDeleteProperty,
   } = useProperties()
 
-  const { useDeleteStatement } = useStatements()
-
-  // Get the mutations
   const updatePropertyMutation = useUpdatePropertyWithValues()
   const addPropertyMutation = useAddPropertyToObject()
   const setValueMutation = useSetPropertyValue()
-  const deleteStatementMutation = useDeleteStatement()
+  const deletePropertyMutation = useDeleteProperty()
 
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<Error | null>(null)
@@ -137,7 +134,7 @@ export function usePropertyManagement(objectUuid?: string) {
   )
 
   /**
-   * Remove a property from an object
+   * Remove a property from an object (soft delete the property)
    */
   const removePropertyFromObject = useCallback(
     async (objectId: string, propertyUuid: string) => {
@@ -145,13 +142,9 @@ export function usePropertyManagement(objectUuid?: string) {
       setError(null)
 
       try {
-        // Remove the property-object relationship directly
-        // The API will handle checking if the relationship exists
-        await deleteStatementMutation.mutateAsync({
-          subject: propertyUuid,
-          predicate: Predicate.IS_PROPERTY_OF,
-          object: objectId,
-        })
+        // Use the property's soft delete API instead of deleting statements
+        // This will properly soft-delete the property
+        await deletePropertyMutation.mutateAsync(propertyUuid)
 
         return { success: true }
       } catch (err) {
@@ -165,7 +158,7 @@ export function usePropertyManagement(objectUuid?: string) {
         setIsLoading(false)
       }
     },
-    [deleteStatementMutation]
+    [deletePropertyMutation]
   )
 
   return {

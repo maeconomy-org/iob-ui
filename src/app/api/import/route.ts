@@ -26,90 +26,50 @@ export async function POST(req: Request) {
     // Generate a unique job ID early
     const jobId = crypto.randomUUID()
 
-    // Get user fingerprint from headers
-    const userFingerprint =
-      req.headers.get('User-Fingerprint') ||
-      req.headers.get('user-fingerprint') ||
-      req.headers.get('createdBy') ||
-      'defaultFingerprint'
+    // Parse request body to get user UUID and data
+    const body = await req.json()
+    const { aggregateEntityList, user } = body
+
+    if (!user?.userUuid) {
+      return NextResponse.json(
+        { error: 'User UUID is required in payload' },
+        { status: 400 }
+      )
+    }
+
+    const userUuid = user.userUuid
 
     // Create initial job record
     await redis.hset(`import:${jobId}`, {
       status: 'receiving',
-      userFingerprint: userFingerprint,
+      userUuid: userUuid,
       createdAt: Date.now().toString(),
     })
 
-    // Stream and process chunks
-    const chunks: Uint8Array[] = []
-    let totalSize = 0
-    const reader = req.body?.getReader()
-
-    if (!reader) {
-      return NextResponse.json(
-        { error: 'Request body could not be read' },
-        { status: 400 }
-      )
-    }
-
-    // Read the stream in chunks
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-
-      totalSize += value.length
-      chunks.push(value)
-
-      // If total size exceeds limit (200MB), abort
-      if (totalSize > 200 * 1024 * 1024) {
-        await redis.hset(`import:${jobId}`, {
-          status: 'failed',
-          error: 'Payload too large (exceeds 200MB)',
-        })
-        return NextResponse.json(
-          { error: 'Payload too large (exceeds 200MB)' },
-          { status: 413 }
-        )
-      }
-    }
-
-    // Combine chunks and parse JSON
-    const buffer = new Uint8Array(totalSize)
-    let position = 0
-
-    for (const chunk of chunks) {
-      buffer.set(chunk, position)
-      position += chunk.length
-    }
-
-    // Parse the JSON
-    let data
-    try {
-      const text = new TextDecoder().decode(buffer)
-      data = JSON.parse(text)
-    } catch (error) {
+    // Validate aggregateEntityList
+    if (!aggregateEntityList || !Array.isArray(aggregateEntityList)) {
       await redis.hset(`import:${jobId}`, {
         status: 'failed',
-        error: 'Invalid JSON format',
+        error: 'Invalid data format: aggregateEntityList must be an array',
       })
       return NextResponse.json(
-        { error: 'Invalid JSON format' },
+        { error: 'Invalid data format: aggregateEntityList must be an array' },
         { status: 400 }
       )
     }
 
-    const { objects } = data
-
-    if (!Array.isArray(objects) || objects.length === 0) {
+    if (aggregateEntityList.length === 0) {
       await redis.hset(`import:${jobId}`, {
         status: 'failed',
-        error: 'Invalid data: objects must be a non-empty array',
+        error: 'Invalid data: aggregateEntityList cannot be empty',
       })
       return NextResponse.json(
-        { error: 'Invalid data: objects must be a non-empty array' },
+        { error: 'Invalid data: aggregateEntityList cannot be empty' },
         { status: 400 }
       )
     }
+
+    const objects = aggregateEntityList
 
     // Update job metadata
     await redis.hset(`import:${jobId}`, {

@@ -12,6 +12,13 @@ import {
   ChevronRight,
   ChevronDown,
   X,
+  Shield,
+  Calendar,
+  Hash,
+  AlertTriangle,
+  CheckCircle,
+  User,
+  Settings,
 } from 'lucide-react'
 
 import {
@@ -39,7 +46,15 @@ import { useSearch } from '@/contexts/search-context'
 export default function Navbar() {
   const pathname = usePathname()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const { certCommonName, certFingerprint, logout } = useAuth()
+  const {
+    certCommonName,
+    certFingerprint,
+    userUuid,
+    certValidFrom,
+    certValidTo,
+    certSerialNumber,
+    logout,
+  } = useAuth()
   const {
     searchQuery,
     setSearchQuery,
@@ -117,56 +132,132 @@ export default function Navbar() {
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="outline"
-                    className="flex items-center gap-2 px-3"
+                    className="flex items-center gap-2 px-3 h-auto hover:bg-muted/50 transition-colors"
                   >
-                    <UserCircle className="h-4 w-4 text-gray-500" />
-                    <span className="text-sm font-medium max-w-32 truncate">
-                      {certCommonName || 'User'}
-                    </span>
-                    <ChevronDown className="h-3 w-3 text-gray-500" />
+                    <User className="h-4 w-4 text-primary" />
+                    <div className="flex flex-col items-start text-left">
+                      <span className="text-sm font-medium max-w-32 truncate leading-tight">
+                        {certCommonName || 'User'}
+                      </span>
+                    </div>
+                    <ChevronDown className="h-3 w-3 text-muted-foreground ml-1" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-80">
                   <DropdownMenuLabel className="font-normal">
-                    <div className="flex flex-col space-y-2">
-                      <p className="text-sm font-medium leading-none">
-                        {certCommonName || 'User'}
-                      </p>
-                      <p className="text-xs leading-none text-muted-foreground">
-                        Certificate Authentication
-                      </p>
+                    <div className="flex items-center space-x-3 py-2">
+                      <div className="size-9 rounded-full bg-primary/10 flex items-center justify-center">
+                        <User className="h-5 w-5 text-primary" />
+                      </div>
+                      <div className="flex flex-col space-y-1">
+                        <p className="text-sm font-semibold leading-none">
+                          {certCommonName || 'User'}
+                        </p>
+                        <div className="flex items-center gap-1">
+                          <Shield className="h-3 w-3 text-green-600" />
+                          <p className="text-xs leading-none text-muted-foreground">
+                            Certificate Authenticated
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
 
-                  {/* Certificate Fingerprint */}
-                  {certFingerprint && (
+                  {/* User UUID */}
+                  {userUuid && (
                     <DropdownMenuItem
-                      className="flex flex-col items-start p-3"
+                      className="flex flex-col items-start p-3 hover:bg-muted/50"
                       onSelect={(e) => e.preventDefault()}
                     >
                       <div className="flex items-center justify-between w-full">
-                        <span className="text-xs font-medium text-muted-foreground">
-                          Certificate Fingerprint
-                        </span>
-                        <CopyButton
-                          text={certFingerprint}
-                          className="h-6 w-6 p-0"
-                        />
+                        <div className="flex items-center gap-2">
+                          <Hash className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-xs font-medium text-muted-foreground">
+                            User UUID
+                          </span>
+                        </div>
+                        <CopyButton text={userUuid} className="h-6 w-6 p-0" />
                       </div>
-                      <code className="text-xs rounded w-full block truncate">
-                        {formatFingerprint(certFingerprint)}
+                      <code className="text-xs bg-muted/30 py-1 rounded w-full block truncate font-mono">
+                        {userUuid}
                       </code>
                     </DropdownMenuItem>
                   )}
 
+                  {/* Certificate Validity Period */}
+                  {(certValidFrom || certValidTo) && (
+                    <DropdownMenuItem
+                      className="flex flex-col items-start p-3 hover:bg-muted/50"
+                      onSelect={(e) => e.preventDefault()}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <Calendar className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-xs font-medium text-muted-foreground">
+                          Certificate Validity
+                        </span>
+                        {certValidTo && (
+                          <div className="ml-auto">
+                            {new Date(certValidTo) < new Date() ? (
+                              <div className="flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 rounded-full">
+                                <AlertTriangle className="h-3 w-3" />
+                                <span className="text-xs font-medium">
+                                  EXPIRED
+                                </span>
+                              </div>
+                            ) : new Date(certValidTo).getTime() -
+                                new Date().getTime() <
+                              30 * 24 * 60 * 60 * 1000 ? (
+                              <div className="flex items-center gap-1 px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full">
+                                <AlertTriangle className="h-3 w-3" />
+                                <span className="text-xs font-medium">
+                                  EXPIRES SOON
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
+                                <CheckCircle className="h-3 w-3" />
+                                <span className="text-xs font-medium">
+                                  VALID
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div className="space-y-1 w-full">
+                        {certValidFrom && (
+                          <div className="flex justify-between text-xs">
+                            <span className="text-muted-foreground">
+                              Valid from:
+                            </span>
+                            <span className="font-mono text-foreground">
+                              {new Date(certValidFrom).toLocaleDateString()}
+                            </span>
+                          </div>
+                        )}
+                        {certValidTo && (
+                          <div className="flex justify-between text-xs">
+                            <span className="text-muted-foreground">
+                              Valid until:
+                            </span>
+                            <span className="font-mono text-foreground">
+                              {new Date(certValidTo).toLocaleDateString()}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </DropdownMenuItem>
+                  )}
+
                   <DropdownMenuSeparator />
+
                   <DropdownMenuItem
                     onClick={logout}
-                    className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
+                    className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer hover:bg-red-50/50 transition-colors"
                   >
                     <LogOut className="h-4 w-4 mr-2" />
-                    Logout
+                    <span className="font-medium">Sign out</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -184,75 +275,83 @@ export default function Navbar() {
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-[80vw] sm:w-[350px] p-0">
+              <SheetContent
+                side="right"
+                className="w-[80vw] sm:w-[350px] p-0 flex flex-col"
+              >
                 <SheetHeader className="border-b p-4">
-                  <SheetTitle className="flex items-center gap-2">
-                    <Building2 className="h-5 w-5 text-primary" />
-                    <span>{APP_ACRONYM}</span>
+                  <SheetTitle className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-5 w-5 text-primary" />
+                      <span>{APP_ACRONYM}</span>
+                    </div>
                   </SheetTitle>
                 </SheetHeader>
-                <div className="py-4">
-                  <div className="px-4 mb-4">
-                    <div className="flex items-center gap-2 p-3 rounded-md border">
-                      <UserCircle className="h-5 w-5 text-gray-500" />
-                      <div className="flex flex-col flex-1">
-                        <span className="text-sm font-medium">
-                          {certCommonName || 'User'}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          Certificate Authentication
-                        </span>
-                      </div>
-                    </div>
 
-                    {/* Mobile Certificate Fingerprint */}
-                    {certFingerprint && (
-                      <div className="mt-3 p-3 rounded-md border">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-medium text-muted-foreground">
-                            Certificate Fingerprint
-                          </span>
-                          <CopyButton
-                            text={certFingerprint}
-                            className="h-6 w-6 p-0"
-                          />
-                        </div>
-                        <code className="text-xs bg-muted px-2 py-1 rounded block break-all">
-                          {certFingerprint}
-                        </code>
-                      </div>
-                    )}
-                  </div>
+                {/* Navigation Items - Top Section */}
+                <div className="flex-1 py-4">
                   <nav className="flex flex-col">
                     {NAV_ITEMS.map((item) => (
                       <SheetClose asChild key={item.path}>
                         <Link
                           href={item.path}
                           className={cn(
-                            'flex items-center py-3 px-4 hover:bg-muted',
+                            'flex items-center justify-between py-3 px-4 hover:bg-muted transition-colors',
                             pathname === item.path ||
                               pathname.startsWith(item.path)
                               ? 'bg-muted text-primary font-medium'
                               : 'text-foreground'
                           )}
                         >
-                          {item.name}
-                          <ChevronRight className="ml-auto h-4 w-4" />
+                          <span>{item.name}</span>
+                          <ChevronRight className="h-4 w-4" />
                         </Link>
                       </SheetClose>
                     ))}
                   </nav>
-                  <div className="mt-4 px-4">
+                </div>
+
+                {/* User Info & Actions - Bottom Section */}
+                <div className="border-t bg-muted/20 p-4 space-y-3">
+                  <div>
+                    <div className="text-sm font-semibold text-foreground">
+                      {certCommonName || 'User'}
+                    </div>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <Shield className="h-3 w-3 text-green-600" />
+                      <span className="text-xs text-muted-foreground">
+                        Certificate Authenticated
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* UUID with Copy Button */}
+                  {userUuid && (
+                    <>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-medium text-muted-foreground">
+                          UUID
+                        </span>
+                        <CopyButton text={userUuid} className="h-5 w-5 p-0" />
+                      </div>
+                      <code className="text-xs block break-all font-mono">
+                        {userUuid}
+                      </code>
+                    </>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div>
                     <Button
                       variant="destructive"
-                      className="w-full"
+                      className="w-full mt-6"
                       onClick={() => {
                         setIsMobileMenuOpen(false)
                         logout()
                       }}
                     >
-                      <LogOut className="h-4 w-4 mr-2" />
-                      Logout
+                      <span className="mr-auto">Sign out</span>
+                      <LogOut className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>

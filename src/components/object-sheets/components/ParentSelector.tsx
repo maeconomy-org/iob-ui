@@ -36,7 +36,7 @@ export function ParentSelector({
   selectedParents,
   onParentsChange,
   placeholder = 'Search for parent objects...',
-  maxSelections = 5,
+  maxSelections = 10,
   disabled = false,
 }: ParentSelectorProps) {
   const [isOpen, setIsOpen] = useState(false)

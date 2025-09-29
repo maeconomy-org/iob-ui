@@ -33,24 +33,9 @@ export function useImportProcess({
   autoRedirect = true,
 }: UseImportProcessOptions = {}): UseImportProcessResult {
   const router = useRouter()
-  const { certFingerprint } = useAuth()
+  const { userUuid } = useAuth()
   const [isImporting, setIsImporting] = useState(false)
   const [importJobId, setImportJobId] = useState<string | null>(null)
-
-  // Get headers with user fingerprint
-  const getHeaders = useCallback(() => {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    }
-
-    // Add user fingerprint if available
-    if (certFingerprint) {
-      headers['User-Fingerprint'] = certFingerprint
-      headers['createdBy'] = certFingerprint
-    }
-
-    return headers
-  }, [certFingerprint])
 
   // Function to start the import
   const startImport = useCallback(
@@ -92,10 +77,24 @@ export function useImportProcess({
           jobId = await handleChunkedUpload(mappedData)
         } else {
           // Standard upload for smaller datasets
+          if (!userUuid) {
+            throw new Error('User UUID is required for import')
+          }
+
+          // Wrap data with user info as required by the new API structure
+          const payload = {
+            aggregateEntityList: mappedData,
+            user: {
+              userUuid,
+            },
+          }
+
           const response = await fetch('/api/import', {
             method: 'POST',
-            headers: getHeaders(),
-            body: JSON.stringify({ objects: mappedData }),
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
           })
 
           if (!response.ok) {
@@ -134,13 +133,17 @@ export function useImportProcess({
         return null
       }
     },
-    [autoRedirect, router, onImportStarted, onImportError, getHeaders]
+    [autoRedirect, router, onImportStarted, onImportError]
   )
 
   // Handle chunked upload for large payloads
   const handleChunkedUpload = useCallback(
     async (mappedData: any[]) => {
       try {
+        if (!userUuid) {
+          throw new Error('User UUID is required for chunked import')
+        }
+
         // Split data into chunks
         const totalObjects = mappedData.length
         const totalChunks = Math.ceil(totalObjects / CHUNK_SIZE)
@@ -165,17 +168,24 @@ export function useImportProcess({
             }
           )
 
-          // Send chunk to API
+          // Send chunk to API with user info
+          const chunkPayload = {
+            aggregateEntityList: chunk,
+            user: {
+              userUuid,
+            },
+            total: totalObjects,
+            chunkIndex,
+            totalChunks,
+            sessionId: jobId, // Only null for first chunk
+          }
+
           const response: Response = await fetch('/api/import/chunk', {
             method: 'POST',
-            headers: getHeaders(),
-            body: JSON.stringify({
-              chunk,
-              total: totalObjects,
-              chunkIndex,
-              totalChunks,
-              sessionId: jobId, // Only null for first chunk
-            }),
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(chunkPayload),
           })
 
           if (!response.ok) {
@@ -222,7 +232,7 @@ export function useImportProcess({
         return null
       }
     },
-    [getHeaders]
+    [userUuid]
   )
 
   // Reset the import state
