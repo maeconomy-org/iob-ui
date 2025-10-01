@@ -30,9 +30,6 @@ export const IMPORT_START_ROW_KEY = 'import_start_row'
 export const IMPORT_COLUMN_MAPPING_KEY = 'import_column_mapping'
 export const IMPORT_MAPPING_TEMPLATES_KEY = 'import_mapping_templates'
 
-// Local storage keys for persistent import state
-export const LOCAL_STORAGE_MAPPING_KEY = 'import_last_column_mapping'
-
 // File processing limits
 export const MAX_FILE_SIZE_MB = 100 // Max file size in MB
 export const STREAM_CHUNK_SIZE = 2 * 1024 * 1024 // 2MB chunks for file streaming

@@ -157,7 +157,7 @@ export function PropertiesTab({
                         />
                         <div className="min-w-0 flex-1">
                           <div className="font-medium text-sm mb-1 break-words">
-                            {prop.key}
+                            {prop.label || prop.key}
                           </div>
                         </div>
                       </div>
@@ -170,7 +170,7 @@ export function PropertiesTab({
                         <div className="flex items-center justify-between pb-2 border-b">
                           <div>
                             <div className="font-medium text-sm">
-                              {prop.key}
+                              {prop.label || prop.key}
                             </div>
                             <div className="flex items-center gap-2">
                               <span className="font-mono text-xs text-muted-foreground">

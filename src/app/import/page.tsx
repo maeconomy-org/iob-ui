@@ -56,6 +56,9 @@ export default function ImportPage() {
     sessionStorage.removeItem(IMPORT_HEADER_ROW_KEY)
     sessionStorage.removeItem(IMPORT_START_ROW_KEY)
     sessionStorage.removeItem(IMPORT_COLUMN_MAPPING_KEY)
+
+    // Also clear any legacy localStorage mappings to prevent confusion
+    localStorage.removeItem('import_last_column_mapping')
   }
 
   const handleFileSelected = (
@@ -68,10 +71,16 @@ export default function ImportPage() {
     // If there's only one sheet, select it automatically
     if (parsedSheets.length === 1) {
       const sheet = parsedSheets[0]
-      handleSheetChange(sheet.name)
+
+      // Set the sheet data directly instead of calling handleSheetChange to avoid timing issues
+      setSelectedSheet(sheet.name)
+      setSelectedSheetData(sheet.data)
+      setSuggestedStartRow(sheet.suggestedStartRow || 0)
     } else if (parsedSheets.length > 0) {
       // Don't auto-select first sheet, leave it empty for user to select
       setSelectedSheet('')
+      setSelectedSheetData([])
+      setSuggestedStartRow(0)
     }
 
     setStep('map-columns')
@@ -82,7 +91,9 @@ export default function ImportPage() {
 
     // Find the selected sheet data
     const selectedSheetInfo = sheets.find((s) => s.name === sheetName)
-    if (!selectedSheetInfo) return
+    if (!selectedSheetInfo) {
+      return
+    }
 
     // Set the sheet data and suggested start row
     setSelectedSheetData(selectedSheetInfo.data)
@@ -204,7 +215,7 @@ export default function ImportPage() {
               </div>
             )}
 
-            {selectedSheetData.length > 0 && (
+            {selectedSheetData.length > 0 ? (
               <ColumnMapper
                 sheetData={selectedSheetData}
                 onColumnsMapped={handleColumnMapped}
@@ -213,6 +224,16 @@ export default function ImportPage() {
                 title="Map Columns"
                 description="Map columns to object properties"
               />
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">
+                  {sheets.length === 0
+                    ? 'No sheets found in file'
+                    : selectedSheet
+                      ? `No data found in sheet "${selectedSheet}"`
+                      : 'Please select a sheet to continue'}
+                </p>
+              </div>
             )}
           </div>
         )}

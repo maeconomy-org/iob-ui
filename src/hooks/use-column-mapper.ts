@@ -4,7 +4,6 @@ import {
   IMPORT_START_ROW_KEY,
   IMPORT_COLUMN_MAPPING_KEY,
   IMPORT_MAPPING_TEMPLATES_KEY,
-  LOCAL_STORAGE_MAPPING_KEY,
   MAX_PREVIEW_ROWS,
 } from '@/constants'
 
@@ -70,6 +69,13 @@ export function useColumnMapper({
   suggestedStartRow = 0,
   initialMapping = {},
 }: UseColumnMapperProps): UseColumnMapperResult {
+  // Clear any legacy localStorage mappings on initialization to avoid confusion
+  // TODO: Remove this once we've confirmed that the new session storage is working
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('import_last_column_mapping')
+    }
+  }, [])
   // Helper to get stored values from storage
   const getSessionValue = (key: string, defaultValue: any) => {
     if (typeof window === 'undefined') return defaultValue
@@ -84,21 +90,21 @@ export function useColumnMapper({
     return stored ? JSON.parse(stored) : defaultValue
   }
 
-  // State for column mapping - try to get from initialMapping, then localStorage, then sessionStorage
+  // State for column mapping - try to get from initialMapping, then sessionStorage only
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>(
     () => {
       if (Object.keys(initialMapping).length > 0) {
         return initialMapping
       }
 
-      // Try to get from sessionStorage first (for current session)
+      // Try to get from sessionStorage first (for current session only)
       const sessionMapping = getSessionValue(IMPORT_COLUMN_MAPPING_KEY, {})
       if (Object.keys(sessionMapping).length > 0) {
         return sessionMapping
       }
 
-      // Fall back to localStorage (persistent across sessions)
-      return getLocalStorageValue(LOCAL_STORAGE_MAPPING_KEY, {})
+      // Start fresh - no localStorage fallback to avoid confusion between different CSV structures
+      return {}
     }
   )
 
@@ -129,23 +135,18 @@ export function useColumnMapper({
     sessionStorage.setItem(IMPORT_START_ROW_KEY, JSON.stringify(startRowIndex))
   }, [startRowIndex])
 
-  // Store column mapping in both session storage (for current session) and local storage (for persistence)
+  // Store column mapping in session storage for current session only (no localStorage persistence)
   useEffect(() => {
     if (typeof window === 'undefined' || !columnMapping) return
 
-    // Only store if there's actually a mapping
+    // Only store in session storage for current session (no localStorage persistence)
     if (Object.keys(columnMapping).length > 0) {
-      // Store in session storage for current session
+      // Store in session storage for current session only
       sessionStorage.setItem(
         IMPORT_COLUMN_MAPPING_KEY,
         JSON.stringify(columnMapping)
       )
-
-      // Also store in local storage for persistence across sessions
-      localStorage.setItem(
-        LOCAL_STORAGE_MAPPING_KEY,
-        JSON.stringify(columnMapping)
-      )
+      // Note: Removed localStorage persistence to avoid confusion between different CSV structures
     }
   }, [columnMapping])
 

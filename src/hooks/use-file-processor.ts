@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import * as XLSX from 'xlsx'
+import Papa from 'papaparse'
 import { MAX_FILE_SIZE_MB, STREAM_CHUNK_SIZE } from '@/constants'
 
 export interface SheetData {
@@ -8,13 +9,13 @@ export interface SheetData {
   suggestedStartRow?: number
 }
 
-export interface UseXlsxProcessorProps {
+export interface UseFileProcessorProps {
   onProgress?: (progress: number) => void
   maxSizeInMB?: number
   streamChunkSize?: number
 }
 
-export interface UseXlsxProcessorResult {
+export interface UseFileProcessorResult {
   processFile: (file: File) => Promise<SheetData[]>
   isProcessing: boolean
   progress: number
@@ -25,11 +26,11 @@ export interface UseXlsxProcessorResult {
 /**
  * Hook for processing XLSX and CSV files with improved handling of large files
  */
-export function useXlsxProcessor({
+export function useFileProcessor({
   onProgress,
   maxSizeInMB = MAX_FILE_SIZE_MB,
   streamChunkSize = STREAM_CHUNK_SIZE, // Use imported constants for default values
-}: UseXlsxProcessorProps = {}): UseXlsxProcessorResult {
+}: UseFileProcessorProps = {}): UseFileProcessorResult {
   const [isProcessing, setIsProcessing] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
   const [progress, setProgress] = useState<number>(0)
@@ -53,6 +54,7 @@ export function useXlsxProcessor({
       setIsProcessing(true)
       setError(null)
       updateProgress(0)
+      console.log(file)
 
       try {
         // Check file size
@@ -68,13 +70,19 @@ export function useXlsxProcessor({
           throw new Error('Please upload an XLSX or CSV file')
         }
 
-        // Use different strategies based on file size
-        if (fileSizeInMB > 5) {
-          // For larger files, use streaming approach
-          return await processLargeFile(file)
+        // Use different processing based on file type
+        if (file.name.endsWith('.csv')) {
+          // For CSV files, use dedicated CSV parser
+          return await processCSVFile(file)
         } else {
-          // For smaller files, use standard approach
-          return await processStandardFile(file)
+          // For XLSX files, use different strategies based on file size
+          if (fileSizeInMB > 5) {
+            // For larger files, use streaming approach
+            return await processLargeFile(file)
+          } else {
+            // For smaller files, use standard approach
+            return await processStandardFile(file)
+          }
         }
       } catch (err) {
         console.error('Error parsing file:', err)
@@ -87,6 +95,67 @@ export function useXlsxProcessor({
     [maxSizeInMB, updateProgress]
   )
 
+  // Process CSV files
+  const processCSVFile = useCallback(
+    async (file: File): Promise<SheetData[]> => {
+      updateProgress(10)
+      const text = await file.text()
+      updateProgress(20)
+
+      updateProgress(30)
+
+      // Parse CSV using papaparse
+      const parseResult = Papa.parse(text, {
+        header: false, // We want raw array data
+        skipEmptyLines: true,
+        transformHeader: (header: string) => header.trim(),
+        transform: (value: string) => {
+          // Try to parse numbers
+          const trimmed = value.trim()
+          if (trimmed === '') return ''
+
+          const numValue = Number(trimmed)
+          if (!isNaN(numValue) && trimmed !== '') {
+            return numValue
+          }
+
+          return trimmed
+        },
+      })
+
+      updateProgress(70)
+
+      if (parseResult.errors.length > 0) {
+        console.warn('CSV parsing warnings:', parseResult.errors)
+      }
+
+      const data = parseResult.data as any[][]
+
+      // Filter out completely empty rows
+      const cleanedData = data.filter(
+        (row) =>
+          row &&
+          Array.isArray(row) &&
+          row.some((cell) => cell !== undefined && cell !== null && cell !== '')
+      )
+
+      // Try to detect the start row by finding patterns
+      const suggestedStartRow = detectDataStartRow(cleanedData)
+
+      updateProgress(100)
+
+      // Return as a single sheet (CSV files only have one sheet)
+      return [
+        {
+          name: 'Sheet1',
+          data: cleanedData,
+          suggestedStartRow,
+        },
+      ]
+    },
+    [updateProgress]
+  )
+
   // Process standard-sized files
   const processStandardFile = useCallback(
     async (file: File): Promise<SheetData[]> => {
@@ -97,6 +166,7 @@ export function useXlsxProcessor({
       // Parse workbook
       const workbook = XLSX.read(buffer, { type: 'array' })
       updateProgress(70)
+      console.log(workbook)
 
       return extractSheetData(workbook)
     },
