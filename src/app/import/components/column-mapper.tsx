@@ -1,10 +1,13 @@
 'use client'
 
+import { useState } from 'react'
+import { toast } from 'sonner'
+import { Save, MoveRight, Undo } from 'lucide-react'
+
 import {
   Input,
   Label,
   Button,
-  Badge,
   Switch,
   Table,
   TableBody,
@@ -26,14 +29,7 @@ import {
   DialogTrigger,
   ScrollArea,
 } from '@/components/ui'
-import {
-  useColumnMapper,
-  PropertyDefinition,
-  DEFAULT_PROPERTIES,
-} from '@/hooks'
-import { useState } from 'react'
-import { Save, MoveRight, Undo } from 'lucide-react'
-import { toast } from 'sonner'
+import { useColumnMapper, DEFAULT_PROPERTIES } from '@/hooks'
 
 interface ColumnMapperProps {
   sheetData: any[]

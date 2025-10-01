@@ -3,7 +3,7 @@
 import { useCallback, useState } from 'react'
 import { Upload, FileSpreadsheet } from 'lucide-react'
 import { FileDropzone } from '@/components/ui/file-dropzone'
-import { useXlsxProcessor, SheetData } from '@/hooks'
+import { useFileProcessor, SheetData } from '@/hooks'
 
 interface FileUploadProps {
   onFileSelected: (file: File, sheets: SheetData[]) => void
@@ -21,7 +21,7 @@ export function FileUpload({
   const [uploadProgress, setUploadProgress] = useState<number>(0)
 
   const { processFile, isProcessing, progress, error, reset } =
-    useXlsxProcessor({
+    useFileProcessor({
       onProgress: setUploadProgress,
       maxSizeInMB,
       streamChunkSize: 2 * 1024 * 1024, // 2MB chunks for better performance
