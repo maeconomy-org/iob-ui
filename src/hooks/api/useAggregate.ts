@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/auth-context'
 export function useAggregate() {
   const client = useIobClient()
   const queryClient = useQueryClient()
-  const { userUuid } = useAuth()
+  const { userUUID } = useAuth()
 
   // Get aggregate entity by UUID (rich data with all relationships)
   const useAggregateByUUID = (uuid: string, options = {}) => {
@@ -87,7 +87,7 @@ export function useAggregate() {
   const useCreateAggregateObject = () => {
     return useMutation({
       mutationFn: async (aggregateEntityList: any[]) => {
-        if (!userUuid) {
+        if (!userUUID) {
           throw new Error('User UUID is required for aggregate creation')
         }
 
@@ -95,7 +95,7 @@ export function useAggregate() {
         const payload = {
           aggregateEntityList,
           user: {
-            userUuid,
+            userUUID,
           },
         }
 
@@ -114,7 +114,7 @@ export function useAggregate() {
   const useImportAggregateObjects = () => {
     return useMutation({
       mutationFn: async (aggregateEntityList: any[]) => {
-        if (!userUuid) {
+        if (!userUUID) {
           throw new Error('User UUID is required for aggregate import')
         }
 
@@ -122,7 +122,7 @@ export function useAggregate() {
         const payload = {
           aggregateEntityList,
           user: {
-            userUuid,
+            userUUID,
           },
         }
 

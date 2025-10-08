@@ -30,19 +30,19 @@ export async function POST(req: Request) {
     const body = await req.json()
     const { aggregateEntityList, user } = body
 
-    if (!user?.userUuid) {
+    if (!user?.userUUID) {
       return NextResponse.json(
         { error: 'User UUID is required in payload' },
         { status: 400 }
       )
     }
 
-    const userUuid = user.userUuid
+    const userUUID = user.userUUID
 
     // Create initial job record
     await redis.hset(`import:${jobId}`, {
       status: 'receiving',
-      userUuid: userUuid,
+      userUUID: userUUID,
       createdAt: Date.now().toString(),
     })
 

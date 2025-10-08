@@ -18,14 +18,14 @@ export async function POST(req: Request) {
     } = body
 
     // Validate user UUID in payload
-    if (!user?.userUuid) {
+    if (!user?.userUUID) {
       return NextResponse.json(
         { error: 'User UUID is required in payload' },
         { status: 400 }
       )
     }
 
-    const userUuid = user.userUuid
+    const userUUID = user.userUUID
     const chunk = aggregateEntityList
 
     if (!Array.isArray(chunk) || chunk.length === 0) {
@@ -54,7 +54,7 @@ export async function POST(req: Request) {
     if (chunkIndex === 0 && !sessionId) {
       await redis.hset(`import:${jobId}`, {
         status: 'receiving',
-        userUuid: userUuid,
+        userUUID: userUUID,
         total: total.toString(),
         processed: '0',
         failed: '0',

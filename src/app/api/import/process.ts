@@ -78,9 +78,9 @@ export async function processImportJob(jobId: string) {
     )
 
     // Get user UUID from job metadata
-    const userUuid = jobData.userUuid
+    const userUUID = jobData.userUUID
 
-    if (!userUuid) {
+    if (!userUUID) {
       throw new Error('User UUID not found in job metadata')
     }
 
@@ -93,7 +93,7 @@ export async function processImportJob(jobId: string) {
         const payload = {
           aggregateEntityList: batch,
           user: {
-            userUuid,
+            userUUID,
           },
         }
 

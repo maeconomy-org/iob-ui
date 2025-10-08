@@ -73,18 +73,18 @@ export interface ImportResult {
 export function useImportApi() {
   const client = useIobClient()
   const queryClient = useQueryClient()
-  const { userUuid } = useAuth()
+  const { userUUID } = useAuth()
 
   const importSingleObject = useMutation({
     mutationFn: async (objectData: ImportObjectData): Promise<any> => {
-      if (!userUuid) {
+      if (!userUUID) {
         throw new Error('User UUID is required for import')
       }
 
       // Wrap data with required structure
       const payload = {
         aggregateEntityList: [objectData],
-        user: { userUuid },
+        user: { userUUID },
       }
 
       const response = await client.aggregate.createAggregateObject(payload)
