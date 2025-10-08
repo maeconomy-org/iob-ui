@@ -33,7 +33,7 @@ export function useImportProcess({
   autoRedirect = true,
 }: UseImportProcessOptions = {}): UseImportProcessResult {
   const router = useRouter()
-  const { userUuid } = useAuth()
+  const { userUUID } = useAuth()
   const [isImporting, setIsImporting] = useState(false)
   const [importJobId, setImportJobId] = useState<string | null>(null)
 
@@ -77,7 +77,7 @@ export function useImportProcess({
           jobId = await handleChunkedUpload(mappedData)
         } else {
           // Standard upload for smaller datasets
-          if (!userUuid) {
+          if (!userUUID) {
             throw new Error('User UUID is required for import')
           }
 
@@ -85,7 +85,7 @@ export function useImportProcess({
           const payload = {
             aggregateEntityList: mappedData,
             user: {
-              userUuid,
+              userUUID,
             },
           }
 
@@ -140,7 +140,7 @@ export function useImportProcess({
   const handleChunkedUpload = useCallback(
     async (mappedData: any[]) => {
       try {
-        if (!userUuid) {
+        if (!userUUID) {
           throw new Error('User UUID is required for chunked import')
         }
 
@@ -172,7 +172,7 @@ export function useImportProcess({
           const chunkPayload = {
             aggregateEntityList: chunk,
             user: {
-              userUuid,
+              userUUID,
             },
             total: totalObjects,
             chunkIndex,
@@ -232,7 +232,7 @@ export function useImportProcess({
         return null
       }
     },
-    [userUuid]
+    [userUUID]
   )
 
   // Reset the import state

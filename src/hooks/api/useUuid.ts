@@ -55,7 +55,7 @@ export function useUuid() {
   // Authorize UUID access
   const useAuthorizeUuid = () => {
     return useMutation({
-      mutationFn: async (params: { userUuid: UUID; resourceId: UUID }) => {
+      mutationFn: async (params: { userUUID: UUID; resourceId: UUID }) => {
         const response = await client.uuid.authorize(params)
         return response.data
       },

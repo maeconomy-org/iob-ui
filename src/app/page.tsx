@@ -110,7 +110,7 @@ export default function AuthPage() {
         timestamp: Date.now(),
         certFingerprint,
         certCommonName,
-        userUuid: baseAuth.userUuid,
+        userUUID: baseAuth.userUUID,
         certValidFrom: baseAuth.certificateInfo.validFrom,
         certValidTo: baseAuth.certificateInfo.validTo,
         certSerialNumber: baseAuth.certificateInfo.serialNumber,

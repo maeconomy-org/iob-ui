@@ -49,7 +49,7 @@ export default function Navbar() {
   const {
     certCommonName,
     certFingerprint,
-    userUuid,
+    userUUID,
     certValidFrom,
     certValidTo,
     certSerialNumber,
@@ -165,7 +165,7 @@ export default function Navbar() {
                   <DropdownMenuSeparator />
 
                   {/* User UUID */}
-                  {userUuid && (
+                  {userUUID && (
                     <DropdownMenuItem
                       className="flex flex-col items-start p-3 hover:bg-muted/50"
                       onSelect={(e) => e.preventDefault()}
@@ -177,10 +177,10 @@ export default function Navbar() {
                             User UUID
                           </span>
                         </div>
-                        <CopyButton text={userUuid} className="h-6 w-6 p-0" />
+                        <CopyButton text={userUUID} className="h-6 w-6 p-0" />
                       </div>
                       <code className="text-xs bg-muted/30 py-1 rounded w-full block truncate font-mono">
-                        {userUuid}
+                        {userUUID}
                       </code>
                     </DropdownMenuItem>
                   )}
@@ -326,16 +326,16 @@ export default function Navbar() {
                   </div>
 
                   {/* UUID with Copy Button */}
-                  {userUuid && (
+                  {userUUID && (
                     <>
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-medium text-muted-foreground">
                           UUID
                         </span>
-                        <CopyButton text={userUuid} className="h-5 w-5 p-0" />
+                        <CopyButton text={userUUID} className="h-5 w-5 p-0" />
                       </div>
                       <code className="text-xs block break-all font-mono">
-                        {userUuid}
+                        {userUUID}
                       </code>
                     </>
                   )}

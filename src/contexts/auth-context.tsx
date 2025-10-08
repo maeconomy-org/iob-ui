@@ -16,7 +16,7 @@ interface AuthData {
   timestamp: number
   certCommonName?: string
   certFingerprint?: string
-  userUuid?: string
+  userUUID?: string
   certValidFrom?: string // Certificate validity start date
   certValidTo?: string // Certificate validity end date
   certSerialNumber?: string // Certificate serial number
@@ -27,7 +27,7 @@ interface AuthContextType {
   isAuthenticated: boolean
   certCommonName: string | undefined
   certFingerprint: string | undefined
-  userUuid: string | undefined
+  userUUID: string | undefined
   certValidFrom: string | undefined
   certValidTo: string | undefined
   certSerialNumber: string | undefined
@@ -41,7 +41,7 @@ const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
   certCommonName: undefined,
   certFingerprint: undefined,
-  userUuid: undefined,
+  userUUID: undefined,
   certValidFrom: undefined,
   certValidTo: undefined,
   certSerialNumber: undefined,
@@ -65,7 +65,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [certFingerprint, setCertFingerprint] = useState<string | undefined>(
     undefined
   )
-  const [userUuid, setUserUuid] = useState<string | undefined>(undefined)
+  const [userUUID, setUserUuid] = useState<string | undefined>(undefined)
   const [certValidFrom, setCertValidFrom] = useState<string | undefined>(
     undefined
   )
@@ -102,7 +102,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             setIsAuthenticated(true)
             setCertCommonName(parsed.certCommonName)
             setCertFingerprint(parsed.certFingerprint)
-            setUserUuid(parsed.userUuid)
+            setUserUuid(parsed.userUUID)
             setCertValidFrom(parsed.certValidFrom)
             setCertValidTo(parsed.certValidTo)
             setCertSerialNumber(parsed.certSerialNumber)
@@ -131,7 +131,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setIsAuthenticated(true)
     setCertCommonName(authData.certCommonName)
     setCertFingerprint(authData.certFingerprint)
-    setUserUuid(authData.userUuid)
+    setUserUuid(authData.userUUID)
     setCertValidFrom(authData.certValidFrom)
     setCertValidTo(authData.certValidTo)
     setCertSerialNumber(authData.certSerialNumber)
@@ -156,7 +156,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         isAuthenticated,
         certCommonName,
         certFingerprint,
-        userUuid,
+        userUUID,
         certValidFrom,
         certValidTo,
         certSerialNumber,
