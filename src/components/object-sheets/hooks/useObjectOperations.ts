@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
+import { Predicate } from 'iob-client'
+import { useQueryClient } from '@tanstack/react-query'
 
-import { useImportApi, useObjects } from '@/hooks'
-import { useIobClient } from '@/providers/query-provider'
 import { getUploadService } from '@/lib/upload-service'
+import { useIobClient } from '@/providers/query-provider'
 import type { ImportObjectData } from '@/hooks/api/useImportApi'
+import { useImportApi, useObjects, useStatements } from '@/hooks'
 
 import type { Attachment } from '../utils/attachments'
 
@@ -41,6 +43,14 @@ export function useObjectOperations({
 
   // Get the import API hook (faster approach)
   const { importSingleObject } = useImportApi()
+
+  // Get the statements API for parent relationships
+  const { useCreateStatement } = useStatements()
+  const createStatementMutation = useCreateStatement()
+
+  // Get query client for manual invalidation
+  const queryClient = useQueryClient()
+
   const client = useIobClient()
 
   useEffect(() => {
@@ -130,7 +140,17 @@ export function useObjectOperations({
       // Step 3: Create object via new Aggregate API
       const importResult = await importSingleObject.mutateAsync(importData)
 
-      // Step 4: Show immediate success and handle file uploads in background
+      // Step 3.5: Handle parent relationships if any (BEFORE showing success)
+      const createdObjectUuid = getCreatedObjectUuid(importResult)
+      if (object.parents && object.parents.length > 0 && createdObjectUuid) {
+        try {
+          await createParentRelationships(object.parents, createdObjectUuid)
+        } catch (error) {
+          console.error('Error creating parent relationships:', error)
+        }
+      }
+
+      // Step 4: Show success only after everything is complete
       toast.success('Object created successfully!', {
         id: 'save-object',
         description:
@@ -169,6 +189,12 @@ export function useObjectOperations({
           )
         }
       }
+
+      // Manually invalidate queries after everything is complete (object + relationships)
+      // This ensures the object appears in the correct location immediately
+      queryClient.invalidateQueries({ queryKey: ['objects'] })
+      queryClient.invalidateQueries({ queryKey: ['aggregates'] })
+      queryClient.invalidateQueries({ queryKey: ['statements'] })
 
       // Trigger refetch if provided
       if (onRefetch) {
@@ -409,6 +435,55 @@ export function useObjectOperations({
       aggregateResult?.object?.properties // Object wrapper
 
     return properties?.[propertyIndex] || null
+  }
+
+  /**
+   * Extract the created object UUID from the import result
+   */
+  const getCreatedObjectUuid = (importResult: any): string | null => {
+    return (
+      importResult?.uuid ||
+      importResult?.objectUuid ||
+      importResult?.data?.uuid ||
+      importResult?.[0]?.uuid ||
+      null
+    )
+  }
+
+  /**
+   * Create parent-child relationships using the statement API
+   */
+  const createParentRelationships = async (
+    parentUuids: string[],
+    childUuid: string
+  ): Promise<void> => {
+    console.log('Creating parent relationships:', {
+      parents: parentUuids,
+      child: childUuid,
+    })
+
+    // Create statements for each parent relationship
+    for (const parentUuid of parentUuids) {
+      // Create IS_PARENT_OF statement (parent -> child)
+      await createStatementMutation.mutateAsync({
+        subject: parentUuid,
+        predicate: Predicate.IS_PARENT_OF,
+        object: childUuid,
+      })
+
+      // Create IS_CHILD_OF statement (child -> parent)
+      await createStatementMutation.mutateAsync({
+        subject: childUuid,
+        predicate: Predicate.IS_CHILD_OF,
+        object: parentUuid,
+      })
+
+      console.log(`Created parent relationship: ${parentUuid} -> ${childUuid}`)
+    }
+
+    console.log(
+      `Successfully created ${parentUuids.length} parent relationships`
+    )
   }
 
   return {
