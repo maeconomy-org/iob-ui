@@ -1,4 +1,5 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation } from '@tanstack/react-query'
+
 import { useIobClient } from '@/providers/query-provider'
 import { useAuth } from '@/contexts/auth-context'
 
@@ -72,7 +73,6 @@ export interface ImportResult {
  */
 export function useImportApi() {
   const client = useIobClient()
-  const queryClient = useQueryClient()
   const { userUUID } = useAuth()
 
   const importSingleObject = useMutation({
@@ -90,11 +90,8 @@ export function useImportApi() {
       const response = await client.aggregate.createAggregateObject(payload)
       return response.data
     },
-    onSuccess: () => {
-      // Invalidate relevant queries after successful import
-      queryClient.invalidateQueries({ queryKey: ['objects'] })
-      queryClient.invalidateQueries({ queryKey: ['aggregates'] })
-    },
+    // Remove automatic query invalidation - let the calling code handle it
+    // This prevents the object from appearing in the root before relationships are created
   })
 
   return {
