@@ -1,0 +1,264 @@
+'use client'
+
+import React, { useState, useEffect } from 'react'
+import { Search, Package } from 'lucide-react'
+import type { UUObjectDTO } from 'iob-client'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  Button,
+  Input,
+  Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Badge,
+  ScrollArea,
+} from '@/components/ui'
+import { useCommonApi } from '@/hooks/api'
+import { UNIT_CATEGORIES } from '@/constants'
+
+interface ObjectSelectionData {
+  object: UUObjectDTO
+  quantity?: number
+  unit?: string
+}
+
+interface ObjectSelectionModalProps {
+  isOpen: boolean
+  onClose: () => void
+  onSave: (data: ObjectSelectionData) => void
+  title?: string
+  initialData?: ObjectSelectionData
+}
+
+export function ObjectSelectionModal({
+  isOpen,
+  onClose,
+  onSave,
+  title = 'Select Object',
+  initialData,
+}: ObjectSelectionModalProps) {
+  const [searchTerm, setSearchTerm] = useState('')
+  const [selectedObject, setSelectedObject] = useState<UUObjectDTO | null>(null)
+  const [quantity, setQuantity] = useState<number | undefined>(undefined)
+  const [unit, setUnit] = useState<string>('')
+
+  const { useSearch } = useCommonApi()
+  const searchMutation = useSearch()
+
+  const [objects, setObjects] = useState<any[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+
+  // Debounce search execution
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (isOpen && searchTerm.trim().length >= 2) {
+        setIsSearching(true)
+        searchMutation
+          .mutateAsync({
+            searchTerm: searchTerm.trim(),
+            size: 50, // Limit to 50 results
+            page: 0,
+          })
+          .then((response) => {
+            setObjects(response?.content || [])
+          })
+          .catch((error) => {
+            console.error('Search failed:', error)
+            setObjects([])
+          })
+          .finally(() => {
+            setIsSearching(false)
+          })
+      } else if (searchTerm.trim().length < 2) {
+        setObjects([])
+        setIsSearching(false)
+      }
+    }, 300)
+
+    return () => clearTimeout(timeout)
+  }, [searchTerm, isOpen])
+
+  useEffect(() => {
+    if (initialData) {
+      setSelectedObject(initialData.object)
+      setQuantity(initialData.quantity)
+      setUnit(initialData.unit || '')
+    } else {
+      setSelectedObject(null)
+      setQuantity(undefined)
+      setUnit('')
+    }
+    setSearchTerm('')
+  }, [initialData, isOpen])
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!selectedObject) {
+      return
+    }
+
+    onSave({
+      object: selectedObject,
+      ...(quantity !== undefined && { quantity }),
+      ...(unit && { unit }),
+    })
+
+    // Reset form
+    setSelectedObject(null)
+    setQuantity(undefined)
+    setUnit('')
+    setSearchTerm('')
+    setObjects([])
+  }
+
+  const handleCancel = () => {
+    setSelectedObject(null)
+    setQuantity(undefined)
+    setUnit('')
+    setSearchTerm('')
+    setObjects([])
+    onClose()
+  }
+
+  return (
+    <Dialog open={isOpen} onOpenChange={handleCancel}>
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Package className="h-5 w-5 text-blue-600" />
+            {title}
+          </DialogTitle>
+        </DialogHeader>
+
+        <form
+          onSubmit={handleSubmit}
+          className="flex-1 flex flex-col space-y-4 mt-4"
+        >
+          {/* Search Objects */}
+          <div className="space-y-2">
+            <Label htmlFor="search">Search Objects</Label>
+            <div className="relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Input
+                id="search"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Type to search objects..."
+                className="pl-10"
+              />
+            </div>
+          </div>
+
+          {/* Object List */}
+          <div className="space-y-2 flex-1">
+            <Label>Available Objects</Label>
+            <ScrollArea className="h-48 border rounded-lg">
+              {isSearching ? (
+                <div className="p-4 text-center text-gray-500">
+                  Searching objects...
+                </div>
+              ) : objects.length === 0 ? (
+                <div className="p-4 text-center text-gray-500">
+                  {searchTerm.trim().length >= 2
+                    ? 'No objects found matching your search'
+                    : 'Type at least 2 characters to search for objects'}
+                </div>
+              ) : (
+                <div className="p-2 space-y-1">
+                  {objects.map((object) => (
+                    <div
+                      key={object.uuid}
+                      className={`px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
+                        selectedObject?.uuid === object.uuid
+                          ? 'bg-blue-50 border-blue-300'
+                          : 'hover:bg-gray-50'
+                      }`}
+                      onClick={() => setSelectedObject(object)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="font-medium">{object.name}</div>
+                        <div className="text-xs text-gray-400">
+                          {object.uuid?.slice(-8)}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </div>
+
+          {/* Selected Object Summary */}
+          {selectedObject && (
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary">Selected</Badge>
+                <span className="font-medium">{selectedObject.name}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Quantity and Unit (Optional) */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="quantity">Quantity (Optional)</Label>
+              <Input
+                id="quantity"
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={quantity || ''}
+                onChange={(e) => setQuantity(e.target.value ? Number(e.target.value) : undefined)}
+                placeholder="Enter quantity"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="unit">Unit (Optional)</Label>
+              <Select value={unit} onValueChange={setUnit}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select unit" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(UNIT_CATEGORIES).map(
+                    ([categoryKey, category]) => (
+                      <div key={categoryKey}>
+                        <div className="px-2 py-1 text-xs font-semibold text-gray-500 bg-gray-100">
+                          {category.label}
+                        </div>
+                        {category.units.map((unitOption) => (
+                          <SelectItem key={unitOption} value={unitOption}>
+                            {unitOption}
+                          </SelectItem>
+                        ))}
+                      </div>
+                    )
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex justify-end gap-2 pt-4">
+            <Button type="button" variant="outline" onClick={handleCancel}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={!selectedObject}>
+              {initialData ? 'Update' : 'Add'} Material
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+export default ObjectSelectionModal

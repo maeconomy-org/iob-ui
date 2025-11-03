@@ -36,6 +36,7 @@ import { isExternalFileReference, type Attachment } from '../utils/attachments'
 import { FilesTab } from './FilesTab'
 import { MetadataTab } from './MetadataTab'
 import { PropertiesTab } from './PropertiesTab'
+import { RelationshipsTab } from './RelationshipsTab'
 import { AttachmentModal } from './AttachmentModal'
 
 interface ObjectSheetProps {
@@ -57,7 +58,7 @@ export function ObjectDetailsSheet({
   const [activeEditingSection, setActiveEditingSection] = useState<
     string | null
   >(null)
-  const [activeTab, setActiveTab] = useState('metadata')
+  const [activeTab, setActiveTab] = useState('properties')
 
   // File management state
   const [isObjectFilesModalOpen, setIsObjectFilesModalOpen] = useState(false)
@@ -88,7 +89,7 @@ export function ObjectDetailsSheet({
   useEffect(() => {
     if (isOpen) {
       // Reset to metadata tab and clear editing state when modal opens
-      setActiveTab('metadata')
+      setActiveTab('properties')
       setActiveEditingSection(null)
     }
   }, [isOpen])
@@ -264,49 +265,17 @@ export function ObjectDetailsSheet({
             </div>
           ) : (
             <div className="py-6">
-              {/* Tabs Container */}
               <Tabs
                 value={activeTab}
                 onValueChange={handleTabChange}
                 className="w-full"
               >
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="metadata">Metadata</TabsTrigger>
-                  <TabsTrigger value="files">Files</TabsTrigger>
+                <TabsList className="grid w-full grid-cols-4">
                   <TabsTrigger value="properties">Properties</TabsTrigger>
+                  <TabsTrigger value="files">Files</TabsTrigger>
+                  <TabsTrigger value="relationships">Relationships</TabsTrigger>
+                  <TabsTrigger value="metadata">Metadata</TabsTrigger>
                 </TabsList>
-
-                <TabsContent value="metadata" className="mt-0">
-                  <MetadataTab
-                    object={object}
-                    parents={parents}
-                    setParents={setParents}
-                    addressData={addressData}
-                    editedAddressData={editedAddressData}
-                    setEditedAddressData={setEditedAddressData}
-                    editedObject={editedObject}
-                    setEditedObject={setEditedObject}
-                    isDeleted={isDeleted}
-                    activeEditingSection={activeEditingSection}
-                    setActiveEditingSection={setActiveEditingSection}
-                    onSaveMetadata={handleSaveMetadata}
-                    onSaveParents={handleSaveParents}
-                    onSaveAddress={handleSaveAddress}
-                  />
-                </TabsContent>
-
-                <TabsContent value="files" className="mt-0">
-                  <FilesTab
-                    object={object}
-                    files={files}
-                    objectFiles={objectFiles}
-                    setObjectFiles={setObjectFiles}
-                    isObjectFilesModalOpen={isObjectFilesModalOpen}
-                    setIsObjectFilesModalOpen={setIsObjectFilesModalOpen}
-                    onUploadComplete={handleUploadComplete}
-                    isDeleted={isDeleted}
-                  />
-                </TabsContent>
 
                 <TabsContent value="properties" className="mt-0">
                   <PropertiesTab
@@ -320,6 +289,46 @@ export function ObjectDetailsSheet({
                     attachmentModal={attachmentModal}
                     setAttachmentModal={setAttachmentModal}
                     onUploadComplete={handleUploadComplete}
+                  />
+                </TabsContent>
+                <TabsContent value="files" className="mt-0">
+                  <FilesTab
+                    object={object}
+                    files={files}
+                    objectFiles={objectFiles}
+                    setObjectFiles={setObjectFiles}
+                    isObjectFilesModalOpen={isObjectFilesModalOpen}
+                    setIsObjectFilesModalOpen={setIsObjectFilesModalOpen}
+                    onUploadComplete={handleUploadComplete}
+                    isDeleted={isDeleted}
+                  />
+                </TabsContent>
+
+                <TabsContent value="relationships" className="mt-0">
+                  <RelationshipsTab
+                    object={object}
+                    isDeleted={isDeleted}
+                    parents={parents}
+                    setParents={setParents}
+                    activeEditingSection={activeEditingSection}
+                    setActiveEditingSection={setActiveEditingSection}
+                    onSaveParents={handleSaveParents}
+                  />
+                </TabsContent>
+
+                <TabsContent value="metadata" className="mt-0">
+                  <MetadataTab
+                    object={object}
+                    addressData={addressData}
+                    editedAddressData={editedAddressData}
+                    setEditedAddressData={setEditedAddressData}
+                    editedObject={editedObject}
+                    setEditedObject={setEditedObject}
+                    isDeleted={isDeleted}
+                    activeEditingSection={activeEditingSection}
+                    setActiveEditingSection={setActiveEditingSection}
+                    onSaveMetadata={handleSaveMetadata}
+                    onSaveAddress={handleSaveAddress}
                   />
                 </TabsContent>
               </Tabs>

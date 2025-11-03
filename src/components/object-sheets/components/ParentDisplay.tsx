@@ -30,7 +30,7 @@ export function ParentDisplay({ parents, className = '' }: ParentDisplayProps) {
 
         // Create a display name - show name if available, otherwise truncated UUID
         const displayName =
-          parentName || `${parentUuid.slice(0, 6)}...${parentUuid.slice(-6)}`
+          parentName || `${parentUuid.slice(0, 12)}...${parentUuid.slice(-12)}`
         const fullUuid = parentUuid
 
         return (
@@ -40,7 +40,7 @@ export function ParentDisplay({ parents, className = '' }: ParentDisplayProps) {
               className="font-mono text-xs cursor-pointer"
               title={`Parent: ${fullUuid}${parentName ? ` (${parentName})` : ''}`}
             >
-              <span className="truncate max-w-32">{displayName}</span>
+              <span>{displayName}</span>
             </Badge>
             <CopyButton
               text={fullUuid}

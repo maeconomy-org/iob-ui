@@ -20,3 +20,11 @@ export const formatFingerprint = (fingerprint: string) => {
     ? `${fingerprint.slice(0, 24)}...`
     : fingerprint
 }
+
+export function formatUUID(uuid: string) {
+  return uuid.length > 12 ? `${uuid.slice(0, 12)}...${uuid.slice(-12)}` : uuid
+}
+
+export function toCapitalize(str: string) {
+  return str.charAt(0).toUpperCase() + str.slice(1)
+}

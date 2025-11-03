@@ -11,6 +11,10 @@ export const AUTH_SESSION_TIMEOUT = 12 * 60 * 60 * 1000 // 12 hours in milliseco
 export const NAV_ITEMS = [
   { name: 'Objects', path: '/objects' },
   { name: 'Import', path: '/import' },
+  { name: 'I/O Processes', path: '/processes' },
+  { name: 'Templates', path: '#', isDisabled: true },
+  { name: 'API Documentation', path: '#', isDisabled: true },
+  { name: 'Export Data', path: '#', isDisabled: true },
 ]
 
 // Footer links
@@ -36,3 +40,72 @@ export const STREAM_CHUNK_SIZE = 2 * 1024 * 1024 // 2MB chunks for file streamin
 export const IMPORT_CHUNK_SIZE = 500 // Process 500 objects at a time
 export const SIZE_THRESHOLD_MB = 5 // Use chunking for datasets larger than 5MB
 export const MAX_PREVIEW_ROWS = 500 // Maximum number of rows to process for preview
+
+// -------------------------------------------------------
+// Process-related constants
+// -------------------------------------------------------
+
+// Process types (based on actual API model)
+export const PROCESS_TYPES = [
+  { value: 'processing', label: 'Processing', icon: '⚙️' },
+  { value: 'assembly', label: 'Assembly', icon: '🔧' },
+  { value: 'recycling', label: 'Recycling', icon: '♻️' },
+  { value: 'disposal', label: 'Disposal', icon: '🗑️' },
+]
+
+// Unit categories for material selection
+export const UNIT_CATEGORIES = {
+  volume: { label: 'Volume', units: ['L', 'mL', 'm³', 'gal'] },
+  weight: { label: 'Weight/Mass', units: ['kg', 'g', 't', 'lb'] },
+  area: { label: 'Area', units: ['m²', 'cm²', 'ft²'] },
+  length: { label: 'Length', units: ['m', 'mm', 'cm', 'ft', 'in'] },
+  count: { label: 'Count', units: ['pcs', 'ea', 'units', 'items'] },
+  energy: {
+    label: 'Energy/Environmental',
+    units: ['kWh', 'kg CO2e', 'MJ', 'BTU'],
+  },
+}
+
+// -------------------------------------------------------
+// Formula-related constants
+// -------------------------------------------------------
+
+// Available formula types for property value calculations
+export const FORMULA_TYPES = [
+  {
+    value: 'sum',
+    label: 'Sum (A + B + C)',
+    description: 'Add multiple property values together',
+    icon: '➕',
+  },
+  {
+    value: 'multiply',
+    label: 'Multiply (A × B × C)',
+    description: 'Multiply property values together',
+    icon: '✖️',
+  },
+  {
+    value: 'percentage',
+    label: 'Percentage (A/B × 100)',
+    description: 'Calculate percentage from two values',
+    icon: '%',
+  },
+  {
+    value: 'ratio',
+    label: 'Ratio (A:B)',
+    description: 'Calculate ratio between two values',
+    icon: ':',
+  },
+  {
+    value: 'average',
+    label: 'Average (A + B + C) / n',
+    description: 'Calculate average of multiple values',
+    icon: '≈',
+  },
+  {
+    value: 'difference',
+    label: 'Difference (A - B)',
+    description: 'Calculate difference between two values',
+    icon: '➖',
+  },
+]

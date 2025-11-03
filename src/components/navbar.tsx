@@ -6,7 +6,6 @@ import { usePathname } from 'next/navigation'
 import {
   Building2,
   Search,
-  UserCircle,
   LogOut,
   Menu,
   ChevronRight,
@@ -18,7 +17,6 @@ import {
   AlertTriangle,
   CheckCircle,
   User,
-  Settings,
 } from 'lucide-react'
 
 import {
@@ -38,23 +36,16 @@ import {
   CopyButton,
   Input,
 } from '@/components/ui'
-import { cn, formatFingerprint } from '@/lib/utils'
-import { APP_ACRONYM, NAV_ITEMS } from '@/constants'
+import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/auth-context'
+import { APP_ACRONYM, NAV_ITEMS } from '@/constants'
 import { useSearch } from '@/contexts/search-context'
 
 export default function Navbar() {
   const pathname = usePathname()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const {
-    certCommonName,
-    certFingerprint,
-    userUUID,
-    certValidFrom,
-    certValidTo,
-    certSerialNumber,
-    logout,
-  } = useAuth()
+  const { certCommonName, userUUID, certValidFrom, certValidTo, logout } =
+    useAuth()
   const {
     searchQuery,
     setSearchQuery,
@@ -80,13 +71,17 @@ export default function Navbar() {
             <nav className="hidden md:flex items-center gap-6">
               {NAV_ITEMS.map((item) => (
                 <Link
-                  key={item.path}
-                  href={item.path}
+                  key={item.name}
+                  href={item.isDisabled ? '#' : item.path}
+                  aria-disabled={item.isDisabled}
                   className={cn(
-                    'text-sm font-medium transition-colors hover:cursor-pointer hover:text-primary',
+                    'text-sm font-medium transition-colors',
                     pathname === item.path || pathname.startsWith(item.path)
                       ? 'text-primary'
-                      : 'text-muted-foreground'
+                      : 'text-muted-foreground',
+                    item.isDisabled
+                      ? 'text-gray-400 cursor-not-allowed'
+                      : 'hover:cursor-pointer hover:text-primary'
                   )}
                 >
                   {item.name}
