@@ -13,14 +13,10 @@ import {
   HereAddressAutocomplete,
 } from '@/components/ui'
 import { formatFingerprint } from '@/lib/utils'
-import { ParentDisplay } from './ParentDisplay'
-import { ParentSelector } from './ParentSelector'
 import { getObjectTimestamps, getSoftDeleteInfo } from '../utils'
 
 interface MetadataTabProps {
   object?: any
-  parents: any[]
-  setParents: (parents: any[]) => void
   addressData: any
   editedAddressData: any
   setEditedAddressData: (data: any) => void
@@ -30,14 +26,11 @@ interface MetadataTabProps {
   activeEditingSection: string | null
   setActiveEditingSection: (section: string | null) => void
   onSaveMetadata: () => Promise<void>
-  onSaveParents: () => Promise<void>
   onSaveAddress: () => Promise<void>
 }
 
 export function MetadataTab({
   object,
-  parents,
-  setParents,
   addressData,
   editedAddressData,
   setEditedAddressData,
@@ -47,14 +40,12 @@ export function MetadataTab({
   activeEditingSection,
   setActiveEditingSection,
   onSaveMetadata,
-  onSaveParents,
   onSaveAddress,
 }: MetadataTabProps) {
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
 
   // Derived states for editing modes
   const isMetadataEditing = activeEditingSection === 'metadata'
-  const isParentsEditing = activeEditingSection === 'parents'
   const isAddressEditing = activeEditingSection === 'address'
 
   // Handle section edit toggling
@@ -240,39 +231,6 @@ export function MetadataTab({
                 rows={3}
               />
             </div>
-          </div>
-        )}
-      />
-
-      {/* Parent Objects Section - Editable */}
-      <Separator />
-      <EditableSection
-        title="Parent Objects"
-        isEditing={isParentsEditing}
-        onEditToggle={(isEditing) => handleEditToggle('parents', isEditing)}
-        onSave={onSaveParents}
-        successMessage="Parent objects updated successfully"
-        showToast={false}
-        renderDisplay={() => (
-          <div>
-            {parents && parents.length > 0 ? (
-              <ParentDisplay parents={parents} />
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                No parent objects assigned
-              </p>
-            )}
-          </div>
-        )}
-        renderEdit={() => (
-          <div className="space-y-4">
-            <ParentSelector
-              selectedParents={parents}
-              onParentsChange={setParents}
-              placeholder="Search for parent objects..."
-              maxSelections={50}
-              currentObjectUuid={object?.uuid}
-            />
           </div>
         )}
       />

@@ -36,6 +36,7 @@ export function createEmptyProperty() {
       {
         uuid: '',
         value: '',
+        formula: '',
         files: [],
       },
     ],

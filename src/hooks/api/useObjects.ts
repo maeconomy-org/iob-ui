@@ -42,6 +42,37 @@ export function useObjects() {
     })
   }
 
+  // Get multiple objects by UUIDs efficiently (for name resolution, etc.)
+  const useObjectsByUUIDs = (
+    uuids: string[],
+    options?: { enabled?: boolean }
+  ) => {
+    return useQuery({
+      queryKey: ['objects', 'byUUIDs', uuids.sort()], // Sort for consistent cache key
+      queryFn: async () => {
+        if (!uuids.length) return []
+
+        // Filter out empty/invalid UUIDs and deduplicate
+        const validUuids = Array.from(new Set(uuids.filter(Boolean)))
+        if (!validUuids.length) return []
+
+        // Use Promise.all to fetch all objects in parallel
+        const responses = await Promise.all(
+          validUuids.map((uuid) =>
+            client.objects.getObjects({ uuid }).catch(() => ({ data: [] }))
+          )
+        )
+
+        // Flatten results and create a map for easy lookup
+        const objects = responses.flatMap((response) => response.data || [])
+
+        return objects
+      },
+      enabled: uuids.length > 0 && options?.enabled !== false,
+      staleTime: 5 * 60 * 1000, // Cache for 5 minutes since names don't change often
+    })
+  }
+
   // Create object mutation - using new simplified method
   const useCreateObject = () => {
     return useMutation({
@@ -172,6 +203,7 @@ export function useObjects() {
   return {
     useAllObjects,
     useObject,
+    useObjectsByUUIDs,
     useCreateObject,
     useCreateFullObject,
     useUpdateObjectMetadata,

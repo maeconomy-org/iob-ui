@@ -9,6 +9,7 @@ import {
 } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { AUTH_SESSION_KEY } from '@/constants'
+import { useCommonApi } from '@/hooks/api'
 
 // Auth data type
 interface AuthData {
@@ -34,6 +35,7 @@ interface AuthContextType {
   login: (authData: AuthData) => void
   logout: () => void
   checkAuth: () => boolean
+  handleCertificateAuth: () => Promise<{ success: boolean; error?: string }>
 }
 
 // Default auth context
@@ -48,6 +50,7 @@ const AuthContext = createContext<AuthContextType>({
   login: () => {},
   logout: () => {},
   checkAuth: () => false,
+  handleCertificateAuth: async () => ({ success: false }),
 })
 
 // Auth provider props
@@ -73,6 +76,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [certSerialNumber, setCertSerialNumber] = useState<string | undefined>(
     undefined
   )
+
+  // Get API hooks
+  const { useRequestCertificate } = useCommonApi()
+  const requestCertificate = useRequestCertificate()
 
   // Public pages that don't require authentication
   const publicPages = ['/', '/help', '/terms', '/privacy']
@@ -150,6 +157,101 @@ export function AuthProvider({ children }: AuthProviderProps) {
     router.push('/')
   }
 
+  // Handle certificate authentication
+  const handleCertificateAuth = async (): Promise<{
+    success: boolean
+    error?: string
+  }> => {
+    try {
+      // Initiate auth flow
+      const response = await requestCertificate.mutateAsync()
+      console.log('Auth Response:', response)
+
+      // Validate both base and UUID auth responses
+      const baseAuth = response.base
+      const uuidAuth = response.uuid
+
+      // Check if both requests were successful
+      if (!baseAuth || !uuidAuth) {
+        throw new Error('Authentication failed: Invalid response')
+      }
+
+      // Validate base authentication status and account validity
+      if (!baseAuth.enabled) {
+        throw new Error('Account is disabled')
+      }
+      if (!baseAuth.accountNonExpired) {
+        throw new Error('Account has expired')
+      }
+      if (!baseAuth.credentialsNonExpired) {
+        throw new Error('Credentials have expired')
+      }
+      if (!baseAuth.accountNonLocked) {
+        throw new Error('Account is locked')
+      }
+
+      // Validate UUID authentication status and account validity
+      if (!uuidAuth.enabled) {
+        throw new Error('UUID service access is disabled')
+      }
+      if (!uuidAuth.accountNonExpired) {
+        throw new Error('UUID service account has expired')
+      }
+      if (!uuidAuth.credentialsNonExpired) {
+        throw new Error('UUID service credentials have expired')
+      }
+      if (!uuidAuth.accountNonLocked) {
+        throw new Error('UUID service account is locked')
+      }
+
+      // Extract certificate information from base auth
+      const certFingerprint = baseAuth.certificateInfo?.certificateSha256
+      const certCommonName = baseAuth.certificateInfo?.subjectFields?.CN
+
+      if (!certFingerprint || !certCommonName) {
+        throw new Error('Invalid certificate information')
+      }
+
+      // Check certificate validity dates
+      const now = new Date()
+      const validFrom = new Date(baseAuth.certificateInfo.validFrom)
+      const validTo = new Date(baseAuth.certificateInfo.validTo)
+
+      if (now < validFrom) {
+        throw new Error('Certificate is not yet valid')
+      }
+      if (now > validTo) {
+        throw new Error('Certificate has expired')
+      }
+
+      // If we get here, both authentications are valid
+      // Login using auth context
+      login({
+        authenticated: true,
+        timestamp: Date.now(),
+        certFingerprint,
+        certCommonName,
+        userUUID: baseAuth.userUUID,
+        certValidFrom: baseAuth.certificateInfo.validFrom,
+        certValidTo: baseAuth.certificateInfo.validTo,
+        certSerialNumber: baseAuth.certificateInfo.serialNumber,
+      })
+
+      return { success: true }
+    } catch (err) {
+      console.error('Authentication Error:', err)
+
+      // Provide specific error messages
+      const errorMessage =
+        err instanceof Error ? err.message : 'Unknown authentication error'
+
+      return {
+        success: false,
+        error: `Authentication failed: ${errorMessage}. Please ensure you have a valid, non-expired certificate.`,
+      }
+    }
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -163,6 +265,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         login,
         logout,
         checkAuth,
+        handleCertificateAuth,
       }}
     >
       {children}

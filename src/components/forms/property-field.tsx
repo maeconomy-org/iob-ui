@@ -4,17 +4,29 @@ import {
   useFieldArray,
   useFormContext,
 } from 'react-hook-form'
-import { PlusIcon, UploadIcon, XIcon } from 'lucide-react'
+import { PlusIcon, UploadIcon, XIcon, Calculator } from 'lucide-react'
 
 import {
   AttachmentModal,
   AttachmentList,
 } from '@/components/object-sheets/components'
 import { useState } from 'react'
-import { Button } from '@/components/ui'
-import { Input } from '@/components/ui'
-import { Label } from '@/components/ui'
-import { FormItem, FormField, FormControl, FormMessage } from '@/components/ui'
+import {
+  Button,
+  Input,
+  Label,
+  FormItem,
+  FormField,
+  FormControl,
+  FormMessage,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Badge,
+} from '@/components/ui'
+import { FORMULA_TYPES } from '@/constants'
 
 interface PropertyFieldProps {
   control: Control<any>
@@ -54,6 +66,7 @@ export function PropertyField({
   const handleAddValue = () => {
     appendValue({
       value: '',
+      formula: '',
       files: [],
     })
   }
@@ -117,15 +130,7 @@ export function PropertyField({
                   {(field.value?.length || 0) > 0 && (
                     <Label className="text-sm">Property Files</Label>
                   )}
-                  <AttachmentList
-                    attachments={field.value || []}
-                    // onRemoveAttachment={(att) => {
-                    //   const next = (field.value || []).filter(
-                    //     (a: any) => a.uuid !== att.uuid
-                    //   )
-                    //   field.onChange(next)
-                    // }}
-                  />
+                  <AttachmentList attachments={field.value || []} />
                   <AttachmentModal
                     open={isPropertyFilesOpen}
                     onOpenChange={setIsPropertyFilesOpen}
@@ -144,7 +149,7 @@ export function PropertyField({
         <Label className="text-sm">Property Values</Label>
 
         {valueFields.map((valueField, valueIndex) => (
-          <div key={valueField.id} className="space-y-1">
+          <div key={valueField.id} className="space-y-2">
             <div className="flex items-center space-x-2">
               <div className="flex items-center justify-between gap-2 w-full">
                 <FormField
@@ -191,15 +196,7 @@ export function PropertyField({
                   {(field.value?.length || 0) > 0 && (
                     <Label className="text-sm">Value Files</Label>
                   )}
-                  <AttachmentList
-                    attachments={field.value || []}
-                    // onRemoveAttachment={(att) => {
-                    //   const next = (field.value || []).filter(
-                    //     (a: any) => a.index !== att.index
-                    //   )
-                    //   field.onChange(next)
-                    // }}
-                  />
+                  <AttachmentList attachments={field.value || []} />
                   <AttachmentModal
                     open={openValueIndex === valueIndex}
                     onOpenChange={(open) =>
