@@ -223,28 +223,9 @@ export function SankeyDiagram({
     }
   }, [materials, relationships, selectedRelationship])
 
+  // If no chart options, don't render anything (parent handles loading/empty states)
   if (!chartOptions) {
-    return (
-      <div className={`w-full ${className}`}>
-        <div className="flex items-center justify-center h-96 bg-gray-50 rounded-lg">
-          <h3 className="text-center text-gray-400 text-lg mb-2">
-            Loading, please wait...
-          </h3>
-        </div>
-      </div>
-    )
-  }
-
-  if (chartOptions === null && recyclingInfo === null) {
-    return (
-      <div className={`w-full ${className}`}>
-        <div className="flex items-center justify-center h-96 bg-gray-50 rounded-lg">
-          <h3 className="text-center text-gray-400 text-lg mb-2">
-            No process data
-          </h3>
-        </div>
-      </div>
-    )
+    return null
   }
 
   return (

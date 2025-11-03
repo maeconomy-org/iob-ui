@@ -248,19 +248,9 @@ export function NetworkDiagram({
     }
   }, [materials, relationships, selectedRelationship])
 
+  // If no chart options, don't render anything (parent handles loading/empty states)
   if (!chartOptions) {
-    return (
-      <div className={`w-full ${className}`}>
-        <div className="flex items-center justify-center h-96 bg-gray-50 rounded-lg">
-          <div className="text-center">
-            <div className="text-gray-400 text-lg mb-2">No materials data</div>
-            <div className="text-gray-500 text-sm">
-              Load materials to see circular flow network
-            </div>
-          </div>
-        </div>
-      </div>
-    )
+    return null
   }
 
   return (
