@@ -32,12 +32,10 @@ const MaterialFlowPage = () => {
   const [activeVisualization, setActiveVisualization] = useState<
     'sankey' | 'network'
   >('sankey')
-  const [useRealData, setUseRealData] = useState(true)
 
   // Simplified data fetching using custom hook
   const { materials, relationships, isLoading } = useSankeyData({
     objectUuid,
-    useRealData,
   })
 
   // API hooks for mutations only
@@ -46,35 +44,23 @@ const MaterialFlowPage = () => {
 
   const handleProcessSave = async (newProcess: any) => {
     try {
-      if (useRealData) {
-        // Save to real IoB backend using enhanced statements
-        const result = await createProcessFlowMutation.mutateAsync({
-          processName: newProcess.name,
-          processType: newProcess.type,
-          inputMaterials: newProcess.inputMaterials.map((input: any) => ({
-            uuid: input.object.uuid,
-            quantity: input.quantity,
-            unit: input.unit,
-          })),
-          outputMaterials: newProcess.outputMaterials.map((output: any) => ({
-            uuid: output.object.uuid,
-            quantity: output.quantity,
-            unit: output.unit,
-          })),
-        })
+      // Save to real IoB backend using enhanced statements
+      const result = await createProcessFlowMutation.mutateAsync({
+        processName: newProcess.name,
+        processType: newProcess.type,
+        inputMaterials: newProcess.inputMaterials.map((input: any) => ({
+          uuid: input.object.uuid,
+          quantity: input.quantity,
+          unit: input.unit,
+        })),
+        outputMaterials: newProcess.outputMaterials.map((output: any) => ({
+          uuid: output.object.uuid,
+          quantity: output.quantity,
+          unit: output.unit,
+        })),
+      })
 
-        console.log('Process flow saved to IoB backend:', result)
-      } else {
-        // Just log for sample data
-        console.log('New process flow (sample mode):', newProcess)
-        console.log(
-          'Materials:',
-          newProcess.inputMaterials,
-          newProcess.outputMaterials
-        )
-        console.log('Relationships:', newProcess.relationships)
-      }
-
+      console.log('Process flow saved to IoB backend:', result)
       setIsProcessFormOpen(false)
     } catch (error) {
       console.error('Failed to save process flow:', error)
@@ -155,33 +141,52 @@ const MaterialFlowPage = () => {
               </div>
             </CardHeader>
             <CardContent>
-              {activeVisualization === 'network' ? (
-                <NetworkDiagram
-                  materials={materials}
-                  relationships={relationships}
-                  selectedRelationship={selectedRelationship}
-                  onLinkSelect={handleRelationshipSelect}
-                  className="bg-white"
-                />
-              ) : (
-                <SankeyDiagram
-                  materials={materials}
-                  relationships={relationships}
-                  selectedRelationship={selectedRelationship}
-                  onLinkSelect={handleRelationshipSelect}
-                  className="bg-white"
-                />
-              )}
+              <LoadingState
+                isLoading={isLoading}
+                hasNoData={materials.length === 0 || relationships.length === 0}
+                objectUuid={objectUuid}
+                setIsProcessFormOpen={setIsProcessFormOpen}
+                variant="inline"
+              />
+              {!isLoading &&
+                materials.length > 0 &&
+                relationships.length > 0 &&
+                (activeVisualization === 'network' ? (
+                  <NetworkDiagram
+                    materials={materials}
+                    relationships={relationships}
+                    selectedRelationship={selectedRelationship}
+                    onLinkSelect={handleRelationshipSelect}
+                    className="bg-white"
+                  />
+                ) : (
+                  <SankeyDiagram
+                    materials={materials}
+                    relationships={relationships}
+                    selectedRelationship={selectedRelationship}
+                    onLinkSelect={handleRelationshipSelect}
+                    className="bg-white"
+                  />
+                ))}
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="management" className="space-y-6">
-          <RelationshipsTable
-            relationships={relationships}
-            selectedRelationship={selectedRelationship}
-            onRelationshipSelect={handleRelationshipSelect}
+          <LoadingState
+            isLoading={isLoading}
+            hasNoData={relationships.length === 0}
+            objectUuid={objectUuid}
+            setIsProcessFormOpen={setIsProcessFormOpen}
+            variant="card"
           />
+          {!isLoading && relationships.length > 0 && (
+            <RelationshipsTable
+              relationships={relationships}
+              selectedRelationship={selectedRelationship}
+              onRelationshipSelect={handleRelationshipSelect}
+            />
+          )}
         </TabsContent>
       </Tabs>
 
@@ -203,3 +208,80 @@ const MaterialFlowPage = () => {
 }
 
 export default MaterialFlowPage
+
+function LoadingState({
+  isLoading,
+  hasNoData,
+  objectUuid,
+  setIsProcessFormOpen,
+  variant = 'card',
+}: {
+  isLoading: boolean
+  hasNoData: boolean
+  objectUuid: string | null
+  setIsProcessFormOpen: (isOpen: boolean) => void
+  variant?: 'card' | 'inline'
+}) {
+  if (isLoading) {
+    const loadingContent = (
+      <div className="flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-muted-foreground" />
+          <p className="text-muted-foreground">Loading process data...</p>
+        </div>
+      </div>
+    )
+
+    if (variant === 'inline') {
+      return (
+        <div className="h-64 flex items-center justify-center">
+          {loadingContent}
+        </div>
+      )
+    }
+
+    return (
+      <Card>
+        <CardContent className="h-96 flex items-center justify-center p-8">
+          {loadingContent}
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (hasNoData) {
+    const emptyContent = (
+      <div className="text-center">
+        <div className="h-12 w-12 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
+          <BarChart3 className="h-6 w-6 text-muted-foreground" />
+        </div>
+        <h3 className="text-lg font-semibold mb-2">No I/O Processes</h3>
+        <p className="text-muted-foreground mb-4">
+          {objectUuid
+            ? 'No I/O processes found for the selected object.'
+            : 'No I/O processes have been created yet.'}
+        </p>
+        <Button onClick={() => setIsProcessFormOpen(true)}>
+          <PlusCircle className="mr-2 h-4 w-4" />
+          Create First Process
+        </Button>
+      </div>
+    )
+
+    if (variant === 'inline') {
+      return (
+        <div className="h-64 flex items-center justify-center">
+          {emptyContent}
+        </div>
+      )
+    }
+
+    return (
+      <Card>
+        <CardContent className="p-8">{emptyContent}</CardContent>
+      </Card>
+    )
+  }
+
+  return null
+}

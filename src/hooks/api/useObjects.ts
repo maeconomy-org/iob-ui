@@ -43,12 +43,18 @@ export function useObjects() {
   }
 
   // Get multiple objects by UUIDs efficiently (for name resolution, etc.)
+  // includeDeleted: false will filter out soft-deleted objects and handle duplicates by taking the latest version
   const useObjectsByUUIDs = (
     uuids: string[],
-    options?: { enabled?: boolean }
+    options?: { enabled?: boolean; includeDeleted?: boolean }
   ) => {
     return useQuery({
-      queryKey: ['objects', 'byUUIDs', uuids.sort()], // Sort for consistent cache key
+      queryKey: [
+        'objects',
+        'byUUIDs',
+        uuids.sort(),
+        options?.includeDeleted ?? true,
+      ], // Include includeDeleted in cache key
       queryFn: async () => {
         if (!uuids.length) return []
 
@@ -59,12 +65,54 @@ export function useObjects() {
         // Use Promise.all to fetch all objects in parallel
         const responses = await Promise.all(
           validUuids.map((uuid) =>
-            client.objects.getObjects({ uuid }).catch(() => ({ data: [] }))
+            client.objects
+              .getObjects({
+                uuid,
+                softDeleted: options?.includeDeleted ?? true, // Default to true for backward compatibility
+              })
+              .catch(() => ({ data: [] }))
           )
         )
 
-        // Flatten results and create a map for easy lookup
-        const objects = responses.flatMap((response) => response.data || [])
+        // Flatten results
+        let objects = responses.flatMap((response) => response.data || [])
+
+        // If not including deleted, filter them out and handle duplicates by taking latest
+        if (!options?.includeDeleted) {
+          // Group by UUID to handle potential duplicates
+          const objectsByUuid = new Map<string, any[]>()
+
+          objects.forEach((obj: any) => {
+            if (!objectsByUuid.has(obj.uuid)) {
+              objectsByUuid.set(obj.uuid, [])
+            }
+            objectsByUuid.get(obj.uuid)!.push(obj)
+          })
+
+          // For each UUID, take the latest non-deleted object, or if all are deleted, take the latest
+          objects = Array.from(objectsByUuid.entries()).map(
+            ([uuid, versions]) => {
+              // First try to find non-deleted versions
+              const nonDeleted = versions.filter((v: any) => !v.softDeleted)
+
+              if (nonDeleted.length > 0) {
+                // Return the latest non-deleted version
+                return nonDeleted.sort(
+                  (a: any, b: any) =>
+                    new Date(b.updatedAt || b.createdAt || 0).getTime() -
+                    new Date(a.updatedAt || a.createdAt || 0).getTime()
+                )[0]
+              } else {
+                // All are deleted, return the latest deleted version
+                return versions.sort(
+                  (a: any, b: any) =>
+                    new Date(b.updatedAt || b.createdAt || 0).getTime() -
+                    new Date(a.updatedAt || a.createdAt || 0).getTime()
+                )[0]
+              }
+            }
+          )
+        }
 
         return objects
       },

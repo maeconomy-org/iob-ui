@@ -1,11 +1,9 @@
 import { useMemo } from 'react'
 
 import { useObjects, useStatements, useMaterialFlowProcessing } from '@/hooks'
-import { generateComprehensiveData } from '@/lib/sample-data'
 
 interface UseSankeyDataProps {
   objectUuid?: string | null
-  useRealData: boolean
 }
 
 interface SankeyData {
@@ -18,17 +16,14 @@ interface SankeyData {
  * Custom hook to manage sankey data fetching and processing
  * Handles both sample data and real data with optional object filtering
  */
-export function useSankeyData({
-  objectUuid,
-  useRealData,
-}: UseSankeyDataProps): SankeyData {
+export function useSankeyData({ objectUuid }: UseSankeyDataProps): SankeyData {
   const { useStatementsByPredicate, useObjectRelationships } = useStatements()
   const { useObjectsByUUIDs } = useObjects()
 
   // Optimized: Single call for object-specific relationships
   const { data: objectRelationships, isLoading: objectRelationshipsLoading } =
     useObjectRelationships(objectUuid || '', {
-      enabled: useRealData && !!objectUuid,
+      enabled: !!objectUuid,
       predicate: 'IS_INPUT_OF',
       includeDeleted: false,
     })
@@ -36,13 +31,8 @@ export function useSankeyData({
   // Fetch all IS_INPUT_OF statements when not filtering by specific object
   const { data: inputStatements, isLoading: statementsLoading } =
     useStatementsByPredicate('IS_INPUT_OF' as any, {
-      enabled: useRealData && !objectUuid,
+      enabled: !objectUuid,
     })
-
-  // Generate sample data (memoized)
-  const sampleData = useMemo(() => {
-    return generateComprehensiveData()
-  }, [])
 
   // Combine statements based on filtering mode
   const combinedStatements = useMemo(() => {
@@ -63,30 +53,25 @@ export function useSankeyData({
     return Array.from(uuids)
   }, [combinedStatements])
 
-  // Optimized: Only fetch objects that participate in relationships
+  // Optimized: Only fetch objects that participate in relationships (exclude soft-deleted)
   const { data: realObjects, isLoading: objectsLoading } = useObjectsByUUIDs(
     participatingObjectUuids,
     {
-      enabled: useRealData && participatingObjectUuids.length > 0,
+      enabled: participatingObjectUuids.length > 0,
+      includeDeleted: false,
     }
   )
 
   // Process real data using material flow processing hook
-  const realDataConverted = useMaterialFlowProcessing({
+  const { materials, relationships } = useMaterialFlowProcessing({
     inputStatements: combinedStatements,
     realObjects: realObjects || null,
-    enabled: useRealData,
+    enabled: true,
   })
 
   // Determine loading state
-  const isLoading = useRealData
-    ? statementsLoading || objectsLoading || objectRelationshipsLoading
-    : false
-
-  // Return appropriate data based on mode
-  const { materials, relationships } = useRealData
-    ? realDataConverted
-    : sampleData
+  const isLoading =
+    statementsLoading || objectsLoading || objectRelationshipsLoading
 
   return {
     materials,
