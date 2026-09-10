@@ -150,6 +150,37 @@ test.describe('03 - object sheet / tabs and dirty', () => {
     await expect(page.getByTestId('sheet-edit')).toBeVisible()
   })
 
+  /**
+   * Radix unmounts the inactive Details tab, taking the Name field's registered rule with it — so a
+   * save from Properties used to reach the node and come back a bare "failed to save" toast.
+   */
+  test('T13: an emptied name refuses the save from another tab, opens Details and says why', async ({
+    page,
+  }) => {
+    const name = await seedObject(page, 't13')
+    await openObjectSheet(page, rowFor(page, name))
+    await enterEditMode(page)
+
+    await switchTab(page, 'details')
+    await page.getByLabel(/name/i).first().fill('')
+
+    await switchTab(page, 'properties')
+    await expect(page.getByTestId('entity-name-error')).toHaveCount(0)
+
+    const sent: string[] = []
+    page.on('request', (req) => {
+      if (req.method() === 'PATCH') sent.push(req.url())
+    })
+    await saveSheet(page, { expectClose: false })
+
+    await expect(page.getByTestId('entity-name-error')).toBeVisible()
+    await expect(page.getByTestId('sheet-tab-details')).toHaveAttribute(
+      'data-state',
+      'active'
+    )
+    expect(sent).toEqual([])
+  })
+
   test('T12: Esc mid-edit leaves no stale edit-mode flag on reopen', async ({
     page,
   }) => {

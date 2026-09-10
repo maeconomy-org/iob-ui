@@ -85,7 +85,7 @@ export function TemplateSheet({
     },
   })
 
-  const { dirtyFields, isDirty } = form.formState
+  const { dirtyFields, errors, isDirty } = form.formState
 
   const cancel = () => {
     form.reset()
@@ -119,6 +119,7 @@ export function TemplateSheet({
         dirtyFields.description ||
         dirtyFields.version
       ),
+      invalid: !!errors.name,
       content: (
         <div className="space-y-4">
           {template && <EntityFacts entity={template} />}
@@ -131,6 +132,7 @@ export function TemplateSheet({
       value: 'properties',
       label: t('objects.fields.properties'),
       dirty: !!dirtyFields.properties,
+      invalid: !!errors.properties,
       content: (
         <PropertyFields
           form={form}

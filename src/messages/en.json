@@ -233,7 +233,8 @@
     "sortAsc": "Asc",
     "sortDesc": "Desc",
     "hideColumn": "Hide",
-    "columnOptions": "{column} column options"
+    "columnOptions": "{column} column options",
+    "nameRequired": "A name is required"
   },
   "copyButton": {
     "copied": "Copied!",
@@ -665,7 +666,8 @@
       "conflict": "This object changed elsewhere since you opened it. Copy your changes, reopen the object, and apply them again.",
       "invalid": "Could not save — {detail}",
       "notFound": "This object no longer exists.",
-      "propertyKeyRequired": "Give every property a name before saving."
+      "propertyKeyRequired": "Give every property a name before saving.",
+      "nameRequired": "An object needs a name"
     },
     "templateSelector": {
       "label": "Start from a template",
@@ -765,7 +767,8 @@
     "saveError": {
       "flowNeedsObject": "Every input and output must point at an object",
       "needsInput": "A process needs at least one input.",
-      "needsOutput": "A process needs at least one output."
+      "needsOutput": "A process needs at least one output.",
+      "nameRequired": "A process needs a name"
     },
     "deleted": "Process deleted",
     "deleteFailed": "Failed to delete process",

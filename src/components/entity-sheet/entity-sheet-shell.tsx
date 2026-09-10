@@ -28,6 +28,12 @@ export interface SheetTab {
   /** Marks the trigger with a dot when this tab holds edited fields. */
   dirty: boolean
   /**
+   * True when this tab holds a field the submit refused. Radix unmounts inactive tab content, so an
+   * error raised on a field the user cannot see reads as Save doing nothing — the shell opens the
+   * tab instead.
+   */
+  invalid?: boolean
+  /**
    * Plain content, or a render prop receiving `guardUnsaved` — same shape as `footer`, and needed
    * for the same reason: anything inside a tab that LEAVES the sheet (a link out, a route push)
    * throws away unsaved work, and a guard the panel applies but a tab skips is worse than none.
@@ -129,6 +135,23 @@ export function EntitySheetShell({
 
   const requestClose = () => guardUnsaved(() => onOpenChange(false))
 
+  const firstInvalid = tabs?.find((tab) => tab.invalid)?.value
+  const [active, setActive] = useState(firstInvalid ?? tabs?.[0]?.value)
+  const [shown, setShown] = useState(firstInvalid)
+
+  /**
+   * Open the tab holding a refused field, once per refusal.
+   *
+   * Adjusted DURING render rather than in an effect: an effect would paint the old tab first, and
+   * the user would see Save do nothing for a frame before the panel moved. `shown` is what makes it
+   * once — the error stands until the field is fixed, and without it every later render would drag
+   * the user back off any tab they opened in the meantime.
+   */
+  if (firstInvalid !== shown) {
+    setShown(firstInvalid)
+    if (firstInvalid) setActive(firstInvalid)
+  }
+
   return (
     <>
       <Sheet
@@ -163,7 +186,8 @@ export function EntitySheetShell({
               >
                 {tabs ? (
                   <Tabs
-                    defaultValue={tabs[0]?.value}
+                    value={active ?? tabs[0]?.value}
+                    onValueChange={setActive}
                     className="flex min-h-0 flex-1 flex-col"
                   >
                     <div className="px-6 pt-4">

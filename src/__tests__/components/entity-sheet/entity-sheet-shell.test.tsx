@@ -30,12 +30,44 @@ const TABS: SheetTab[] = [
   },
 ]
 
+let handlers = {
+  onOpenChange: vi.fn(),
+  onCancel: vi.fn(),
+  onSubmit: vi.fn(),
+}
+
+function shell(props: Partial<React.ComponentProps<typeof EntitySheetShell>>) {
+  return (
+    <EntitySheetShell
+      open
+      onOpenChange={handlers.onOpenChange}
+      title="Wall"
+      loading={false}
+      editing
+      isDirty={false}
+      dirtyCount={0}
+      onFiles={vi.fn()}
+      onSubmit={handlers.onSubmit}
+      footer={(guardUnsaved) => (
+        <>
+          <button type="submit">Save</button>
+          <button type="button" onClick={() => guardUnsaved(handlers.onCancel)}>
+            Cancel
+          </button>
+        </>
+      )}
+      {...props}
+    />
+  )
+}
+
 function renderShell(
   props: Partial<React.ComponentProps<typeof EntitySheetShell>> = {}
 ) {
   const onOpenChange = vi.fn()
   const onCancel = vi.fn()
   const onSubmit = vi.fn((e: React.FormEvent) => e.preventDefault())
+  handlers = { onOpenChange, onCancel, onSubmit }
   const view = render(
     <EntitySheetShell
       open
@@ -236,6 +268,36 @@ describe('EntitySheetShell', () => {
 
     // A tab can hold a way OUT of the sheet — Relations links to /processes — and that abandons
     // whatever the other tabs edited. So the guard has to reach inside a tab, not just the footer.
+    /**
+     * Radix unmounts inactive tab content, so a field the submit refuses can sit on a tab the user
+     * is not looking at — and Save then reads as doing nothing at all.
+     */
+    describe('a refused field on another tab', () => {
+      const flag = (invalid?: string): SheetTab[] =>
+        TABS.map((tab) => ({ ...tab, invalid: tab.value === invalid }))
+
+      it('opens the tab holding it', () => {
+        const { rerender } = renderShell({ tabs: flag() })
+        expect(screen.getByText('property body')).toBeInTheDocument()
+
+        rerender(shell({ tabs: flag('details') }))
+        expect(screen.getByText('details body')).toBeInTheDocument()
+      })
+
+      it('lets the user leave again while the error still stands', () => {
+        const { rerender } = renderShell({ tabs: flag('details') })
+        expect(screen.getByText('details body')).toBeInTheDocument()
+
+        // Radix Tabs activates on mousedown, not click.
+        fireEvent.mouseDown(screen.getByTestId('sheet-tab-files'))
+        expect(screen.getByText('files body')).toBeInTheDocument()
+
+        // A re-render with the SAME error must not drag them back — only a new refusal moves them.
+        rerender(shell({ tabs: flag('details') }))
+        expect(screen.getByText('files body')).toBeInTheDocument()
+      })
+    })
+
     describe('a tab that leaves the sheet', () => {
       const leaveTab = (onLeave: () => void): SheetTab => ({
         value: 'relations',

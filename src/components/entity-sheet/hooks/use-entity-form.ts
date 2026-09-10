@@ -126,6 +126,21 @@ export function useEntityForm(
   const submit = form.handleSubmit(async (draft) => {
     let committed: ObjectDTO
 
+    /**
+     * Repeated here even though the input carries the same rule: Name lives on the Details tab, and
+     * Radix unmounts an inactive tab, taking the field's registered rule with it. Saving from any
+     * other tab therefore sent the empty name and read the node's 400 back as "failed to save".
+     */
+    if (!draft.name.trim()) {
+      form.setError(
+        'name',
+        { type: 'required', message: 'objects.saveError.nameRequired' },
+        { shouldFocus: true }
+      )
+      toast.error(t('objects.saveError.nameRequired'))
+      return
+    }
+
     // A property with content but no key is dropped by the builders, so saving would silently lose
     // the user's work. Refuse rather than pretend.
     const nameless = findEmptyPropertyKey(draft)

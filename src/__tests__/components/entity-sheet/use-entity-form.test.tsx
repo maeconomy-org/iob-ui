@@ -111,6 +111,48 @@ describe('useEntityForm', () => {
     expect(onSaved).toHaveBeenCalledWith('new-3', [])
   })
 
+  /**
+   * Name lives on the Details tab, which Radix unmounts while another tab is open — taking the
+   * field's registered rule with it. Without a guard in the handler the empty name reached the node
+   * and came back as a bare "failed to save" toast.
+   */
+  describe('an emptied name', () => {
+    it('refuses the save without a network call, and says which field', async () => {
+      const { result } = renderHook(
+        () => useEntityForm(entity({ name: 'Wall A' })),
+        { wrapper: makeWrapper() }
+      )
+
+      act(() => result.current.form.setValue('name', '', { shouldDirty: true }))
+      await act(async () => {
+        await result.current.submit()
+      })
+
+      expect(objects.update).not.toHaveBeenCalled()
+      expect(result.current.form.formState.errors.name?.message).toBe(
+        'objects.saveError.nameRequired'
+      )
+      expect(toastError).toHaveBeenCalledWith('objects.saveError.nameRequired')
+    })
+
+    it('treats whitespace as empty — the node rejects it either way', async () => {
+      const { result } = renderHook(
+        () => useEntityForm(entity({ name: 'Wall A' })),
+        { wrapper: makeWrapper() }
+      )
+
+      act(() =>
+        result.current.form.setValue('name', '   ', { shouldDirty: true })
+      )
+      await act(async () => {
+        await result.current.submit()
+      })
+
+      expect(objects.update).not.toHaveBeenCalled()
+      expect(result.current.form.formState.errors.name).toBeDefined()
+    })
+  })
+
   it('create: submits buildCreateObjectInput and reports the new id', async () => {
     objects.create.mockResolvedValue({ id: 'new-1', operationId: 'op' })
     const onSaved = vi.fn()

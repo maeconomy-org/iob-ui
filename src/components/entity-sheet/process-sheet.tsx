@@ -81,7 +81,7 @@ export function ProcessSheet({
     },
   })
 
-  const { dirtyFields, isDirty } = form.formState
+  const { dirtyFields, errors, isDirty } = form.formState
   const draft = form.watch()
 
   /**
@@ -214,6 +214,7 @@ export function ProcessSheet({
         dirtyFields.description ||
         dirtyFields.properties
       ),
+      invalid: !!(errors.name || errors.properties),
       content: detailsTab,
     },
     {
@@ -232,6 +233,7 @@ export function ProcessSheet({
       value: 'inputs',
       label: t('processes.flows.inputs'),
       dirty: flowsDirty('inputs'),
+      invalid: !!errors.inputs,
       content: (
         <FlowsField
           form={form}
@@ -247,6 +249,7 @@ export function ProcessSheet({
       value: 'outputs',
       label: t('processes.flows.outputs'),
       dirty: flowsDirty('outputs'),
+      invalid: !!errors.outputs,
       content: (
         <FlowsField
           form={form}

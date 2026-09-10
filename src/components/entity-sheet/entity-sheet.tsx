@@ -103,7 +103,7 @@ export function EntitySheet({
     },
   })
 
-  const { dirtyFields, isDirty: formIsDirty } = form.formState
+  const { dirtyFields, errors, isDirty: formIsDirty } = form.formState
   /**
    * A RESUMED draft is unsaved work by definition, even before it is touched.
    *
@@ -229,6 +229,7 @@ export function EntitySheet({
       value: 'properties',
       label: t('objects.fields.properties'),
       dirty: !!dirtyFields.properties,
+      invalid: !!errors.properties,
       content: (
         <PropertyFields
           form={form}
@@ -282,6 +283,7 @@ export function EntitySheet({
         dirtyFields.address ||
         dirtyFields.parentIds
       ),
+      invalid: !!errors.name,
       content: (
         <div className="space-y-4">
           {/* Identity first — what this object IS, before what it says about itself. */}

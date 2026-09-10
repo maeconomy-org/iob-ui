@@ -81,6 +81,18 @@ export function useProcessForm(
   const updateMutation = useUpdate()
 
   const submit = form.handleSubmit(async (draft) => {
+    // Name lives on the Details tab, and Radix unmounts an inactive tab along with the field's
+    // registered rule — saving from any other tab reached the node and came back a 400.
+    if (!draft.name.trim()) {
+      form.setError(
+        'name',
+        { type: 'required', message: 'processes.saveError.nameRequired' },
+        { shouldFocus: true }
+      )
+      toast.error(t('processes.saveError.nameRequired'))
+      return
+    }
+
     const nameless = findEmptyPropertyKey(draft)
     if (nameless >= 0) {
       form.setError(`properties.${nameless}.key`, { type: 'required' })

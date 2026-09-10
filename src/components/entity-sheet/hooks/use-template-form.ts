@@ -90,7 +90,11 @@ export function useTemplateForm(
 
   const submit = form.handleSubmit(async (draft) => {
     if (!draft.name.trim()) {
-      form.setError('name', { type: 'required' })
+      form.setError(
+        'name',
+        { type: 'required', message: 'templates.nameRequired' },
+        { shouldFocus: true }
+      )
       toast.error(t('templates.nameRequired'))
       return
     }
