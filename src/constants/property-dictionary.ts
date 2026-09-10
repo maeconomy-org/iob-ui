@@ -10,6 +10,12 @@ export interface PropertyDictionaryEntry {
    * Optional placeholder shown in the value `<Input>` when this property is
    * picked. Suggestive only — the field still accepts any string.
    * Omit for free-text keys (name, description, notes, material…).
+   *
+   * A NUMERIC placeholder must be something the node can parse. `35%` and
+   * `1200 kg/m3` were shown here and rejected as `unknown-unit` — percent is not a
+   * dimension and compound units are not in the table — so a user who followed the
+   * hint got a value excluded from every formula and rollup reading it. Units come
+   * from `GET /v1/units`; anything outside it belongs in the label, not the example.
    */
   valuePlaceholder?: Record<PropertyDictionaryLocale, string>
 }
@@ -297,7 +303,7 @@ export const PROPERTY_DICTIONARY: PropertyDictionaryEntry[] = [
     key: 'density',
     labels: { en: 'Density', nl: 'Dichtheid' },
     category: 'dimensions',
-    valuePlaceholder: { en: '1200 kg/m3', nl: '1200 kg/m3' },
+    valuePlaceholder: { en: '1200', nl: '1200' },
   },
   {
     key: 'co2-equivalent',
@@ -311,7 +317,7 @@ export const PROPERTY_DICTIONARY: PropertyDictionaryEntry[] = [
     labels: { en: 'Recycled Content', nl: 'Gerecycled Materiaal' },
     aliases: { en: ['recycled'], nl: ['gerecycled'] },
     category: 'sustainability',
-    valuePlaceholder: { en: '35%', nl: '35%' },
+    valuePlaceholder: { en: '35', nl: '35' },
   },
   {
     key: 'energy-label',
@@ -373,7 +379,7 @@ export const PROPERTY_DICTIONARY: PropertyDictionaryEntry[] = [
     labels: { en: 'Recyclability', nl: 'Recyclebaarheid' },
     aliases: { en: ['recyclable'], nl: ['recyclebaar'] },
     category: 'sustainability',
-    valuePlaceholder: { en: '80%', nl: '80%' },
+    valuePlaceholder: { en: '80', nl: '80' },
   },
   {
     key: 'finish',
