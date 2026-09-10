@@ -80,19 +80,6 @@ export const PROCESS_TYPES = [
   { value: 'disposal', labelKey: 'disposal' },
 ] as const
 
-// Unit categories for material selection
-export const UNIT_CATEGORIES = {
-  volume: { labelKey: 'volume', units: ['L', 'mL', 'm³', 'gal'] },
-  weight: { labelKey: 'weight', units: ['kg', 'g', 't', 'lb'] },
-  area: { labelKey: 'area', units: ['m²', 'cm²', 'ft²'] },
-  length: { labelKey: 'length', units: ['m', 'mm', 'cm', 'ft', 'in'] },
-  count: { labelKey: 'count', units: ['pcs', 'ea', 'units', 'items'] },
-  energy: {
-    labelKey: 'energy',
-    units: ['kWh', 'kg CO2e', 'MJ', 'BTU'],
-  },
-} as const
-
 export const DEFAULT_TABLE_PAGE_SIZE = 20
 export const DEFAULT_TABLE_PAGE_SIZE_OPTIONS = [10, 20, 50, 100]
 
