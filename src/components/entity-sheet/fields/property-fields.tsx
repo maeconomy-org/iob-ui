@@ -11,7 +11,12 @@ import {
   Trash2,
   TextInitial,
 } from 'lucide-react'
-import { useFieldArray, useWatch, type UseFormReturn } from 'react-hook-form'
+import {
+  useFieldArray,
+  useFormState,
+  useWatch,
+  type UseFormReturn,
+} from 'react-hook-form'
 import type { EntityRollupEntry } from 'io2p-client'
 
 import {
@@ -352,6 +357,15 @@ function PropertyRow({
    * One subscription for the whole row rather than one per field, because the per-value read below
    * sits inside a `.map()` where a hook cannot go.
    */
+  /**
+   * `useFormState` scoped to this key, NOT `form.formState` — the row receives `form`, so reading
+   * the owner's formState subscribes the OWNER and this row would never re-render on the refusal.
+   * Same trap `useWatch` avoids for values, one field further along.
+   */
+  const keyPath = `${basePath}.${index}.key` as const
+  const rowFormState = useFormState({ control: form.control, name: keyPath })
+  const keyError = form.getFieldState(keyPath, rowFormState).error
+
   const row = useWatch({ control: form.control, name: `${basePath}.${index}` })
   const ownProperties =
     useWatch({ control: form.control, name: basePath }) ?? []
@@ -417,9 +431,15 @@ function PropertyRow({
 
   return (
     <Collapsible
-      open={open}
+      // Forced open while refused: the name field is INSIDE, so a collapsed row would show the
+      // error nowhere and read as Save doing nothing.
+      open={open || !!keyError}
       onOpenChange={setOpen}
-      className={cn('rounded-md border', open && 'shadow-sm')}
+      className={cn(
+        'rounded-md border',
+        open && 'shadow-sm',
+        keyError && 'border-destructive'
+      )}
       data-testid={`property-row-${index}`}
     >
       <div className="flex items-center gap-1 px-3 py-1.5">
@@ -482,7 +502,9 @@ function PropertyRow({
 
       <CollapsibleContent className="space-y-3 border-t px-3 py-3">
         <div className="space-y-1.5">
-          <Label>{t('objects.propertyEditor.name')}</Label>
+          <Label className={cn(keyError && 'text-destructive')}>
+            {t('objects.propertyEditor.name')}
+          </Label>
           <div className="flex items-center gap-2">
             {/* One field, attach button inside (same pattern as the value field). */}
             <div className="flex flex-1 items-center rounded-md border border-input bg-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
@@ -491,6 +513,10 @@ function PropertyRow({
                 className="h-8 border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
                 placeholder={t('objects.propertyEditor.namePlaceholder')}
                 data-testid={`property-name-${index}`}
+                aria-invalid={!!keyError}
+                aria-describedby={
+                  keyError ? `property-key-error-${index}` : undefined
+                }
                 /*
                  * The LABEL, not the key — the field is called "Name" and every other surface
                  * (the row header, the read view, the grid) shows the label. Binding it to the key
@@ -532,6 +558,16 @@ function PropertyRow({
               )}
             </div>
           </div>
+          {keyError && (
+            <p
+              id={`property-key-error-${index}`}
+              data-testid={`property-key-error-${index}`}
+              role="alert"
+              className="text-sm font-medium text-destructive"
+            >
+              {t(keyError.message || 'common.nameRequired')}
+            </p>
+          )}
           {committedKey && propKey && propKey !== committedKey && (
             /*
              * A committed property's key is IMMUTABLE — core rejects it in `PropertyUpdateShape`,

@@ -95,7 +95,10 @@ export function useProcessForm(
 
     const nameless = findEmptyPropertyKey(draft)
     if (nameless >= 0) {
-      form.setError(`properties.${nameless}.key`, { type: 'required' })
+      form.setError(`properties.${nameless}.key`, {
+        type: 'required',
+        message: 'objects.saveError.propertyKeyRequired',
+      })
       toast.error(t('objects.saveError.propertyKeyRequired'))
       return
     }

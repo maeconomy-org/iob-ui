@@ -95,6 +95,42 @@ test.describe('03 - object sheet / property validation', () => {
     await expect(toast(page)).toContainText(/give every property a name/i)
     // Still in EDIT mode — a save that returned the sheet to read mode would have committed.
     await expect(page.getByTestId('sheet-save')).toBeVisible()
+    // The toast is gone in seconds; the row itself has to carry the reason.
+    await expect(page.getByTestId('property-key-error-0')).toBeVisible()
+  })
+
+  /**
+   * The sharper half of PVAL3: a stored row loads COLLAPSED, so the field the refusal names is not
+   * on screen at all. Save then read as doing nothing once the toast faded.
+   */
+  test('PVAL3b: a refused row that was collapsed opens itself', async ({
+    page,
+  }) => {
+    const name = `${stamp()}-pval3b`
+    const panel = await openCreateSheet(page)
+    await panel.getByLabel(/name/i).first().fill(name)
+    await addProperty(page, 0)
+    await fillProperty(page, 0, 'weight', '10 kg')
+    await saveSheet(page)
+    await expect(sheet(page)).toBeHidden()
+
+    await openObjectSheet(page, rowFor(page, name))
+    await enterEditMode(page)
+    await expandProperty(page, 0)
+    await page.getByTestId('property-name-0').fill('')
+
+    // Collapse it again — this is what used to leave the user with nothing to look at.
+    await page.getByTestId('property-toggle-0').click()
+    await expect(page.getByTestId('property-name-0')).toBeHidden()
+
+    await saveSheet(page, { expectClose: false })
+
+    await expect(page.getByTestId('property-name-0')).toBeVisible()
+    await expect(page.getByTestId('property-key-error-0')).toBeVisible()
+
+    // And it clears the moment the name is fixed.
+    await page.getByTestId('property-name-0').fill('weight')
+    await expect(page.getByTestId('property-key-error-0')).toHaveCount(0)
   })
 
   test('PVAL4: a dictionary pick round-trips as its label, never the key', async ({
