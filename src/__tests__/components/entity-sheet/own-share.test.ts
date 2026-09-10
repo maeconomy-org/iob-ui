@@ -100,4 +100,20 @@ describe('ownShare', () => {
     const share = ownShare(bucket(48, 2), [kg(12)], [{ num: 0 }])
     expect(share).toEqual({ own: 0, below: 48, onlyContributor: false })
   })
+
+  // The own values are LIVE and the total is DERIVED, so between a write and its recompute the
+  // object can hold more than the whole subtree reportedly contains. The subtraction stayed
+  // silent about it and printed "500 kg here, -380 kg below" for up to a minute.
+  it('claims no split while the total is behind the value', () => {
+    expect(ownShare(bucket(120, 2), [kg(500)])).toBeNull()
+    expect(ownShare(bucket(120, 2), [kg(100)], [{ num: 3 }])).toBeNull()
+  })
+
+  // The guard must not fire on an object that IS its own total. `0.1 + 0.2` is
+  // 0.30000000000000004 in the browser and 0.3 on the node, so an unrounded comparison lands a
+  // few ulps under zero and would suppress the split on exactly the rows where it is correct.
+  it('survives float noise when the object is the whole total', () => {
+    const share = ownShare(bucket(0.3, 2), [kg(0.1), kg(0.2)])
+    expect(share).toEqual({ own: 0.3, below: 0, onlyContributor: true })
+  })
 })

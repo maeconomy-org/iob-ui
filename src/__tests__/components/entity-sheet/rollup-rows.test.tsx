@@ -12,6 +12,7 @@ import { useForm } from 'react-hook-form'
 import type { EntityRollupEntry, RollupBucket } from 'io2p-client'
 
 import { PropertyFields } from '@/components/entity-sheet/fields'
+import { orderBuckets } from '@/components/entity-sheet/fields/rollup-line'
 import type { EntityDraft } from '@/lib/entity'
 
 const objects = { list: vi.fn(), get: vi.fn() }
@@ -131,12 +132,67 @@ describe('rollup rows in the property read view', () => {
     expect(screen.getByText('4120 kg')).toBeInTheDocument()
     // The own value is 2400 kg of the 4120 kg total, so what the DESCENDANTS
     // add is 1720 kg — the number a reader would otherwise work out by hand.
+    // Both halves are named: the remainder alone reads as a subtraction.
     expect(
       screen.getByText(
-        'objects.properties.rollupBelowShare:{"below":"1720 kg"}'
+        'objects.properties.rollupSplitLabel:{"own":"2400 kg","below":"1720 kg"}'
       )
     ).toBeInTheDocument()
-    expect(screen.getByTestId('rollup-split-bar')).toBeInTheDocument()
+  })
+
+  // `num` compares only WITHIN a dimension. Sorting by it alone made a bare-number bucket the
+  // headline of a property authored in kg, purely because 99999 > 4120, and pushed the kg total
+  // behind the disclosure — where the reader is not looking.
+  it('headlines the total measured in the property’s own unit', () => {
+    renderRollups(
+      [massProperty()],
+      new Map([
+        [
+          'mass',
+          entry({
+            buckets: [
+              bucket({
+                dimension: 'unitless',
+                num: 99999,
+                contributorCount: 5,
+              }),
+              bucket({
+                dimension: 'mass',
+                unit: 'kg',
+                num: 4120,
+                contributorCount: 312,
+              }),
+            ],
+          }),
+        ],
+      ])
+    )
+
+    // The bare-number bucket is still SHOWN — a foreign one opens the disclosure by itself,
+    // because it usually means a value is mis-keyed somewhere below. It just no longer leads.
+    const line = screen.getByTestId('rollup-line').textContent ?? ''
+    expect(line).toContain('4120 kg')
+    expect(line.indexOf('4120 kg')).toBeLessThan(line.indexOf('99999'))
+  })
+
+  it('orders a matching bucket ahead of a larger one, then by size', () => {
+    const kg = bucket({
+      dimension: 'mass',
+      unit: 'kg',
+      num: 10,
+      contributorCount: 1,
+    })
+    const big = bucket({ dimension: 'unitless', num: 900, contributorCount: 1 })
+    const m3 = bucket({
+      dimension: 'volume',
+      unit: 'm3',
+      num: 50,
+      contributorCount: 1,
+    })
+
+    expect(orderBuckets([big, m3, kg], 'kg')).toEqual([kg, big, m3])
+    // No own unit — the unitless bucket is the one that matches what the object holds.
+    expect(orderBuckets([m3, big, kg], undefined)).toEqual([big, m3, kg])
   })
 
   // The card is collapsed by default, so a total rendered inside the disclosure would be invisible
@@ -400,13 +456,15 @@ describe('rollup rows in the property read view', () => {
     )
 
     expect(
-      screen.getByText('objects.properties.rollupBelowShare:{"below":"60 kg"}')
+      screen.getByText(
+        'objects.properties.rollupSplitLabel:{"own":"300 kg","below":"60 kg"}'
+      )
     ).toBeInTheDocument()
   })
 
   // `unitCount` is the only signal a multiplier ran, and it is what makes a MIS-KEYED one visible:
-  // "4120 × 1 kg" reads wrong at a glance where a bare "4120 kg" does not.
-  it('states how many things a scaled total counts, and what each one weighs', () => {
+  // "120 kg, 4120 items" reads wrong at a glance where a bare "120 kg" does not.
+  it('states how many things a scaled total counts', () => {
     renderRollups(
       [
         {
@@ -443,13 +501,58 @@ describe('rollup rows in the property read view', () => {
     )
 
     expect(screen.getByTestId('rollup-unit-count')).toHaveTextContent(
-      'objects.properties.rollupUnitBreakdown:{"count":5,"each":"12 kg"}'
+      'objects.properties.rollupUnitCount:{"count":5}'
     )
+  })
+
+  // The regression that removed the per-unit figure. Five chairs at 12 kg and two at 30 kg is
+  // 120 kg over 7 units, and `num / unitCount` is 17.143 -- a weight neither chair has. The
+  // bucket keeps sums, not contributions, so a truthful "each" cannot be recovered here.
+  it('never divides a mixed total into a per-unit weight', () => {
+    renderRollups(
+      [
+        {
+          id: 'p1',
+          key: 'mass',
+          label: 'Mass',
+          values: [{ id: 'v1', data: '12 kg', num: 12, unit: 'kg' }],
+        },
+        {
+          id: 'p2',
+          key: 'quantity',
+          label: 'Quantity',
+          values: [{ id: 'v2', data: '5', num: 5 }],
+        },
+      ],
+      new Map([
+        [
+          'mass',
+          entry({
+            multipliedBy: 'quantity',
+            descendantCount: 1,
+            buckets: [
+              bucket({
+                dimension: 'mass',
+                unit: 'kg',
+                num: 120,
+                unitCount: 7,
+                contributorCount: 2,
+              }),
+            ],
+          }),
+        ],
+      ])
+    )
+
+    expect(screen.getByTestId('rollup-unit-count')).toHaveTextContent(
+      'objects.properties.rollupUnitCount:{"count":7}'
+    )
+    expect(screen.queryByText(/17\.14/)).not.toBeInTheDocument()
   })
 
   it('says nothing about units when no rule multiplies', () => {
     // `unitCount === contributorCount` is what an unmultiplied total always reports, so printing
-    // it would put "312 × 13.2 kg" on every ordinary rollup in the sheet.
+    // it would put a redundant "312 items" beside "312 values" on every ordinary rollup.
     renderRollups([massProperty()], new Map([['mass', entry()]]))
     expect(screen.queryByTestId('rollup-unit-count')).not.toBeInTheDocument()
   })
@@ -461,7 +564,7 @@ describe('rollup rows in the property read view', () => {
     expect(
       screen.getByText('objects.properties.rollupContributors:{"count":312}')
     ).toBeInTheDocument()
-    expect(screen.queryByTestId('rollup-split-bar')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('rollup-split')).not.toBeInTheDocument()
   })
 
   it('hides an entry the worker has never computed', () => {

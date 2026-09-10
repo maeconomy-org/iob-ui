@@ -610,7 +610,7 @@
       "excludedFromRollups": "excluded from the totals that count by it",
       "excludedFromBoth": "excluded from the formulas and the totals that use it",
       "rollupTotal": "Subtree total",
-      "rollupUnitBreakdown": "{count} × {each}",
+      "rollupUnitCount": "{count, plural, one {# item} other {# items}}",
       "rollupContributors": "{count, plural, one {# value} other {# values}}",
       "rollupSkipped": "{count, plural, one {# not counted} other {# not counted}}",
       "rollupMoreDimensions": "{count, plural, one {+# more unit} other {+# more units}}",
@@ -628,7 +628,6 @@
       },
       "rollupNoNumbers": "No numeric values",
       "rollupOnlyThisObject": "This object only",
-      "rollupBelowShare": "{below} below",
       "rollupSplitLabel": "{own} here, {below} below",
       "rollupDerived": "Derived"
     },

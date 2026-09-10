@@ -35,8 +35,10 @@ export function rollupSaysSomething(entry: EntityRollupEntry): boolean {
 }
 
 /**
- * Trim IEEE-754 noise from the per-unit division, matching the node's own rounding policy so
- * `60 / 5` reads as `12` rather than `11.999999999999998`.
+ * The node's own rounding policy, 12 significant digits (`shared/entity.normalize.ts`). Applied to
+ * the browser-side own sum so it is comparable with a total the server already rounded: `0.1 + 0.2`
+ * is `0.30000000000000004` here and `0.3` there, and the difference decides whether this object is
+ * the whole total or is 4e-17 short of it.
  */
 const round = (n: number) => Number(n.toPrecision(12))
 
@@ -97,8 +99,21 @@ export function ownShare(
     return { own: 0, below: bucket.num, onlyContributor: false }
   }
 
-  const own = contributing.reduce((sum, v) => sum + (v.num ?? 0), 0) * factor
-  const below = bucket.num - own
+  const own = round(
+    contributing.reduce((sum, v) => sum + (v.num ?? 0), 0) * factor
+  )
+  const below = round(bucket.num - own)
+
+  // No split while the total is BEHIND the value. The own values are live — they land with the
+  // write — and `bucket.num` is derived asynchronously, up to a minute later (a 30s per-target
+  // cooldown, a 30s reaper tick, a 30s poll). Edit a 12 kg value to 500 kg on a 120 kg total and
+  // the subtraction produced "500 kg here, -380 kg below" for that whole window. The contributor
+  // count is the honest fallback: it says less, but nothing false.
+  //
+  // Exactly zero must NOT be caught — that is an object which IS its own total, the commonest
+  // case on a leaf. Rounding `own` first is what makes the two cancel exactly instead of landing
+  // a few ulps under.
+  if (below < 0) return null
 
   return {
     own,
@@ -112,6 +127,30 @@ export function ownShare(
     onlyContributor:
       factor === 1 && bucket.contributorCount === contributing.length,
   }
+}
+
+/**
+ * The entry's buckets in reading order: the one measuring what this property actually holds
+ * first, then by magnitude.
+ *
+ * Sorting by `num` alone ranked a 5000 unitless bucket above a 120 kg one and made the bigger
+ * number the headline — a total unrelated to the property being read, with the matching one
+ * hidden behind the disclosure. `num` compares only WITHIN a dimension; across two it is a
+ * coincidence of scale. Reachable whenever a subtree mixes `12 kg` with a bare `500`, since the
+ * two never share a bucket.
+ *
+ * Exported because `property-read-view` picks the same lead to decide whether the card is worth
+ * rendering at all. Two copies of this rule drift, and then they disagree about which bucket the
+ * object is the sole contributor to.
+ */
+export function orderBuckets(
+  buckets: readonly RollupBucket[],
+  ownUnit?: string
+): RollupBucket[] {
+  return [...buckets].sort(
+    (a, b) =>
+      Number(b.unit === ownUnit) - Number(a.unit === ownUnit) || b.num - a.num
+  )
 }
 
 /**
@@ -160,7 +199,7 @@ export function RollupLine({
   className?: string
 }) {
   const t = useTranslations()
-  const buckets = [...entry.buckets].sort((a, b) => b.num - a.num)
+  const buckets = orderBuckets(entry.buckets, ownUnit)
   const [lead, ...rest] = buckets
   const foreign = rest.some((b) => b.unit !== ownUnit)
   const [open, setOpen] = useState(!compact && foreign)
@@ -213,7 +252,7 @@ export function RollupLine({
               >
                 <ChevronRight
                   className={cn(
-                    'h-3 w-3 transition-transform',
+                    'h-3 w-3 transition-transform motion-reduce:transition-none',
                     open && 'rotate-90'
                   )}
                 />
@@ -276,60 +315,47 @@ function BucketAmount({
     )
   }
 
-  const ownPct =
-    share && bucket.num > 0
-      ? Math.min(100, Math.max(0, (share.own / bucket.num) * 100))
-      : null
+  const split = share && bucket.num > 0 ? share : null
 
   // How many THINGS the values represent, when a rule scales them. Equal to `contributorCount`
   // otherwise, and the two differing is the only signal that a multiplier ran at all.
   //
-  // Worth showing for a reason beyond arithmetic: a mis-keyed multiplier produces a plausible
-  // total and a nonsense count. "4120 x 1 kg" reads wrong at a glance where "4120 kg" does not.
+  // The COUNT ONLY, never a per-unit figure. `num / unitCount` is a MEAN: five chairs at 12 kg
+  // and two at 30 kg total 120 kg over 7 units, and dividing prints "7 x 17.143 kg" -- a weight
+  // no chair has and nobody authored. The bucket carries sums, so whether the contributors were
+  // uniform is not knowable here, and the honest reading of the average is unavailable.
+  //
+  // Still worth a line for a reason beyond arithmetic: a mis-keyed multiplier produces a
+  // plausible total and a nonsense count. "120 kg, 4120 items" reads wrong at a glance where
+  // "120 kg" alone does not.
   const scaled =
     bucket.unitCount !== undefined &&
     bucket.unitCount !== bucket.contributorCount &&
     bucket.unitCount > 0
-  const perUnit = scaled
-    ? `${format.number(round(bucket.num / bucket.unitCount))}${unit}`
-    : null
 
   return (
     <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
       <span className="font-medium text-foreground">{amount}</span>
-      {perUnit && (
+      {scaled && (
         <span data-testid="rollup-unit-count">
-          {t('objects.properties.rollupUnitBreakdown', {
+          {t('objects.properties.rollupUnitCount', {
             count: bucket.unitCount as number,
-            each: perUnit,
           })}
         </span>
       )}
-      {ownPct !== null && share ? (
-        <>
-          {/* Two segments, not a percentage: the question is "how much of this
-              is mine and how much is below me", and a bar answers it without
-              the reader subtracting two numbers in their head. */}
-          <span
-            className="flex h-1.5 w-16 overflow-hidden rounded-full bg-muted"
-            role="img"
-            aria-label={t('objects.properties.rollupSplitLabel', {
-              own: `${format.number(share.own)}${unit}`,
-              below: `${format.number(share.below)}${unit}`,
-            })}
-            data-testid="rollup-split-bar"
-          >
-            <span
-              className="bg-foreground/60"
-              style={{ width: `${ownPct}%` }}
-            />
-          </span>
-          <span>
-            {t('objects.properties.rollupBelowShare', {
-              below: `${format.number(share.below)}${unit}`,
-            })}
-          </span>
-        </>
+      {split ? (
+        // BOTH halves as text, never a bar. A partly-filled pill beside a number is the
+        // universal "X of Y done" idiom, and nothing here progresses toward anything -- this is
+        // a composition, mine against my descendants'. And the remainder alone ("60 kg below")
+        // reads as an amount SUBTRACTED from the total; naming the object's own share beside it
+        // is what makes the two visibly add up. This wording already existed as the bar's
+        // aria-label, so screen readers got the clear half and everyone else got the ambiguous one.
+        <span data-testid="rollup-split">
+          {t('objects.properties.rollupSplitLabel', {
+            own: `${format.number(split.own)}${unit}`,
+            below: `${format.number(split.below)}${unit}`,
+          })}
+        </span>
       ) : (
         <span>
           {t('objects.properties.rollupContributors', {

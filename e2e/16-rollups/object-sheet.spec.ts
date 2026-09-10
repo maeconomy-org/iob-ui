@@ -151,20 +151,18 @@ test.describe('16 - rollups / object sheet', () => {
     await expect(page.getByTestId('rollup-line')).toBeVisible()
   })
 
-  test('RU2: the split bar states what is below, not just the total', async ({
+  test('RU2: the split states what is below, not just the total', async ({
     page,
   }) => {
     await page.goto('/objects')
     await expect(page.getByTestId('data-table')).toBeVisible()
     await openObjectSheet(page, rowFor(page, PARENT))
 
-    await expect(page.getByTestId('rollup-split-bar')).toBeVisible()
-    // The bar is the only thing separating own from below, so it carries the accessible name — a
-    // colour-only split states nothing to a screen reader.
-    await expect(page.getByTestId('rollup-split-bar')).toHaveAttribute(
-      'aria-label',
-      /.+/
-    )
+    // Plain text, not a bar. A partly-filled pill read as a progress meter, and the remainder on
+    // its own ("10 kg below") read as a subtraction — so both halves are named, and the number
+    // every reader needs is no longer carried by an aria-label only.
+    await expect(page.getByTestId('rollup-split')).toBeVisible()
+    await expect(page.getByTestId('rollup-split')).toContainText('10 kg')
   })
 
   test('RU5: the card survives the grid layout', async ({ page }) => {
@@ -207,7 +205,7 @@ test.describe('16 - rollups / object sheet', () => {
 
     // The regression `6842843` fixed. A leaf is the sole contributor to its own total, so a card
     // restating its own value in canonical units asserts something below that the reader cannot
-    // see. The split bar is the specific claim that must not appear.
-    await expect(page.getByTestId('rollup-split-bar')).toHaveCount(0)
+    // see. The own/below split is the specific claim that must not appear.
+    await expect(page.getByTestId('rollup-split')).toHaveCount(0)
   })
 })

@@ -29,7 +29,12 @@ import type { EntityRollupEntry } from 'io2p-client'
 
 import { FilesDisclosure } from '../files'
 import { DeletedRow } from './deleted-row'
-import { RollupLine, ownShare, rollupSaysSomething } from './rollup-line'
+import {
+  RollupLine,
+  orderBuckets,
+  ownShare,
+  rollupSaysSomething,
+} from './rollup-line'
 import { FormulaSummary } from './formula-value-editor'
 import {
   ValueNormalization,
@@ -190,7 +195,7 @@ export function PropertyReadView({
           // the moment a contributor is scaled.
           if (entry.descendantCount === 0 && !entry.multipliedBy) return false
 
-          const lead = [...entry.buckets].sort((a, b) => b.num - a.num)[0]
+          const lead = orderBuckets(entry.buckets, ownUnit(property))[0]
           // With no bucket the entry can only report skips, and `ownShare` has
           // nothing to compare — which kept the card on every leaf whose values are
           // all unreadable ("5 lux"). Its own skips covering the count means the
