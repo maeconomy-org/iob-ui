@@ -154,16 +154,20 @@ test.describe('16 - rollups / the quantity multiplier', () => {
     await expect(page.getByTestId('data-table')).toBeVisible()
     await openObjectSheet(page, rowFor(page, LEAF))
 
-    // 12 kg at a quantity of 5, so the total is 60 and the breakdown says where it came from.
-    //
-    // Not "the card does not mention 12 kg": the per-unit figure legitimately prints it, and an
-    // assertion on its ABSENCE would fail the moment the line says what each thing weighs — which
-    // is the point of the breakdown. The pair of numbers is what separates "the multiplier ran"
-    // from "the value was copied up".
+    // 12 kg at a quantity of 5, so the total is 60 and the line says how many things it counted.
+    // The pair — the scaled total and the count — is what separates "the multiplier ran" from
+    // "the value was copied up"; either number alone is satisfied by the wrong build.
     const card = page.getByTestId('rollup-card')
     await expect(card).toContainText('60')
-    await expect(page.getByTestId('rollup-unit-count')).toContainText('5')
-    await expect(page.getByTestId('rollup-unit-count')).toContainText('12 kg')
+
+    const unitCount = page.getByTestId('rollup-unit-count')
+    await expect(unitCount).toContainText('5')
+
+    // And it claims nothing about what one of them weighs. `num / unitCount` is a MEAN, not a
+    // per-unit weight — five chairs at 12 kg beside two at 30 kg printed "7 × 17.143 kg", a figure
+    // nobody authored (`d28336e`). The absence is anchored by the count assertion above, so this
+    // cannot pass on a line that stopped rendering.
+    await expect(unitCount).not.toContainText('kg')
   })
 
   test('RU26: a quantity the node cannot read is marked on the value', async ({
